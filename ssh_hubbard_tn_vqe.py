@@ -39,11 +39,11 @@ def q_index(site: int, spin: str, L: int) -> int:
     """
     Map (site, spin) to a qubit index in [0, 2L-1].
 
-    Convention:
-    - spin == "up":   qubit = site
-    - spin == "down": qubit = L + site
+    Convention (UNIFIED): [site0↑, site0↓, site1↑, site1↓, ..., site(L-1)↑, site(L-1)↓]
+    - spin == "up":   qubit = 2*site + 0
+    - spin == "down": qubit = 2*site + 1
 
-    This matches the layout used in ssh_hubbard_vqe.py.
+    This matches the canonical layout used in ssh_hubbard_vqe.py.
 
     Parameters
     ----------
@@ -59,12 +59,7 @@ def q_index(site: int, spin: str, L: int) -> int:
     qubit_index : int
         The qubit index for this (site, spin) pair
     """
-    if spin == "up":
-        return site
-    elif spin == "down":
-        return L + site
-    else:
-        raise ValueError(f"spin must be 'up' or 'down', got {spin}")
+    return 2 * site + (0 if spin == "up" else 1)
 
 
 def jw_number_operator(site: int, spin: str, L: int) -> SparsePauliOp:
@@ -91,9 +86,10 @@ def jw_number_operator(site: int, spin: str, L: int) -> SparsePauliOp:
     q = q_index(site, spin, L)
 
     # n = (I - Z) / 2
+    # CORRECTED: Qiskit Pauli string convention - rightmost = qubit 0
     pauli_I = ['I'] * N
     pauli_Z = ['I'] * N
-    pauli_Z[q] = 'Z'
+    pauli_Z[N - 1 - q] = 'Z'  # Reversed indexing
 
     pauli_I_str = ''.join(pauli_I)
     pauli_Z_str = ''.join(pauli_Z)
@@ -134,24 +130,26 @@ def jw_hopping_operator(site_i: int, site_j: int, spin: str, L: int) -> SparsePa
 
     # Build Jordan-Wigner string
     # c†_i c_j + h.c. = (X_i Z_{...} X_j) + (Y_i Z_{...} Y_j)
+    # CORRECTED: Qiskit Pauli string convention - rightmost = qubit 0
     pauli_XX = ['I'] * N
     pauli_YY = ['I'] * N
 
-    pauli_XX[qi] = 'X'
-    pauli_YY[qi] = 'Y'
+    pauli_XX[N - 1 - qi] = 'X'  # Reversed indexing
+    pauli_YY[N - 1 - qi] = 'Y'  # Reversed indexing
 
     # Jordan-Wigner string of Z's between qi and qj
     for q in range(qi + 1, qj):
-        pauli_XX[q] = 'Z'
-        pauli_YY[q] = 'Z'
+        pauli_XX[N - 1 - q] = 'Z'  # Reversed indexing
+        pauli_YY[N - 1 - q] = 'Z'  # Reversed indexing
 
-    pauli_XX[qj] = 'X'
-    pauli_YY[qj] = 'Y'
+    pauli_XX[N - 1 - qj] = 'X'  # Reversed indexing
+    pauli_YY[N - 1 - qj] = 'Y'  # Reversed indexing
 
     pauli_XX_str = ''.join(pauli_XX)
     pauli_YY_str = ''.join(pauli_YY)
 
-    return SparsePauliOp([pauli_XX_str, pauli_YY_str], coeffs=[1.0, 1.0])
+    # Jordan-Wigner: c†_i c_j + h.c. = 1/2 (XX + YY) [with Z string]
+    return SparsePauliOp([pauli_XX_str, pauli_YY_str], coeffs=[0.5, 0.5])
 
 
 def ssh_hubbard_hamiltonian(

@@ -1089,6 +1089,51 @@ def build_ansatz_np_hva_sshh(L: int, reps: int) -> QuantumCircuit:
 
 
 # ============================================================================
+# INITIAL STATE PREPARATION FOR NUMBER-CONSERVING ANSÄTZE
+# ============================================================================
+
+def prepare_half_filling_state(L: int) -> QuantumCircuit:
+    """
+    Prepare a simple half-filling initial state for number-conserving ansätze.
+
+    For spinful SSH-Hubbard with L sites and 2L qubits:
+    - Qubit layout: [site0↑, site0↓, site1↑, site1↓, ..., site(L-1)↑, site(L-1)↓]
+    - Prepare state with L electrons (half-filling) in a simple pattern
+
+    Strategy: Fill alternating spin-up and spin-down orbitals
+    - Sites 0, 2, 4, ... get spin-up electron (apply X gate)
+    - Sites 1, 3, 5, ... get spin-down electron (apply X gate)
+
+    This ensures:
+    - Total particle number = L (half-filling)
+    - Spin-balanced state
+    - Non-vacuum initial point for number-conserving gates
+
+    Parameters:
+        L: Number of lattice sites
+
+    Returns:
+        QuantumCircuit that prepares the half-filling state
+    """
+    N = 2 * L  # Total qubits
+    qc = QuantumCircuit(N)
+
+    # Fill alternating sites with alternating spins
+    # Site 0: spin-up, Site 1: spin-down, Site 2: spin-up, etc.
+    for site in range(L):
+        if site % 2 == 0:
+            # Even sites: add spin-up electron
+            q_up = q_index(site, 'up', L)
+            qc.x(q_up)
+        else:
+            # Odd sites: add spin-down electron
+            q_down = q_index(site, 'down', L)
+            qc.x(q_down)
+
+    return qc
+
+
+# ============================================================================
 # VQE HISTORY TRACKING
 # ============================================================================
 
@@ -1154,6 +1199,9 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
         N = 2 * L
 
         # Build ansatz
+        number_conserving_ansatze = ['hva', 'dqap', 'np_hva']
+        needs_initial_state = ansatz_kind in number_conserving_ansatze
+
         if ansatz_kind == 'hea':
             ansatz = build_ansatz_hea(N, reps)
         elif ansatz_kind == 'hva':
@@ -1168,6 +1216,14 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
             ansatz = build_ansatz_np_hva_sshh(L, reps)
         else:
             raise ValueError(f"Unknown ansatz: {ansatz_kind}")
+
+        # For number-conserving ansätze, prepend initial state preparation
+        if needs_initial_state:
+            initial_state = prepare_half_filling_state(L)
+            full_circuit = QuantumCircuit(N)
+            full_circuit.compose(initial_state, inplace=True)
+            full_circuit.compose(ansatz, inplace=True)
+            ansatz = full_circuit
 
         # Initial point: warm-start or random
         if theta_prev is None or len(theta_prev) != ansatz.num_parameters:
@@ -1380,6 +1436,11 @@ Examples:
 
     # Build ansatz
     print(f"\n--- Building {args.ansatz.upper()} Ansatz ---")
+
+    # Determine if this ansatz needs initial state preparation (number-conserving)
+    number_conserving_ansatze = ['hva', 'dqap', 'np_hva']
+    needs_initial_state = args.ansatz in number_conserving_ansatze
+
     if args.ansatz == 'hea':
         ansatz = build_ansatz_hea(N, args.reps)
     elif args.ansatz == 'hva':
@@ -1394,6 +1455,15 @@ Examples:
         ansatz = build_ansatz_np_hva_sshh(L, args.reps)
     else:
         raise ValueError(f"Unknown ansatz: {args.ansatz}")
+
+    # For number-conserving ansätze, prepend initial state preparation
+    if needs_initial_state:
+        print("  (Adding half-filling initial state preparation for number-conserving ansatz)")
+        initial_state = prepare_half_filling_state(L)
+        full_circuit = QuantumCircuit(N)
+        full_circuit.compose(initial_state, inplace=True)
+        full_circuit.compose(ansatz, inplace=True)
+        ansatz = full_circuit
 
     print(f"Circuit depth:  {ansatz.depth()}")
     print(f"Parameters:     {ansatz.num_parameters}")

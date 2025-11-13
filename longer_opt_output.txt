@@ -1,0 +1,32 @@
+################################################################################
+# LONGER VQE OPTIMIZATIONS
+################################################################################
+
+System Parameters:
+  L = 6 sites (12 qubits)
+  δ = 0.333
+  U = 2.00
+
+Building Hamiltonian...
+  Pauli terms: 39
+
+Computing exact ground state...
+  E_exact = -4.0107137460
+
+================================================================================
+ANSATZ: NP_HVA
+================================================================================
+
+  Running with maxiter=200...
+    Energy:       -3.7310273784
+    Error:        0.279686 (6.973%)
+    Evaluations:  11607
+    Runtime:      167.74s
+
+  Running with maxiter=500...
+    Energy:       -3.7509396251
+    Error:        0.259774 (6.477%)
+    Evaluations:  15052
+    Runtime:      221.79s
+
+  Running with maxiter=1000...

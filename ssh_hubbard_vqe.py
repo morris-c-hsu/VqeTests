@@ -1089,6 +1089,227 @@ def build_ansatz_np_hva_sshh(L: int, reps: int) -> QuantumCircuit:
 
 
 # ============================================================================
+# TENSOR-NETWORK BRICK-WALL ANSÄTZE (TN-MPS)
+# ============================================================================
+
+def apply_tn_block_su4_like(
+    qc: QuantumCircuit,
+    prefix: str,
+    layer: int,
+    block_id: int,
+    q0: int,
+    q1: int,
+) -> None:
+    """
+    Append a generic 2-qubit TN block on (q0, q1) with SU(4)-like decomposition.
+
+    Template (all parameters independent):
+      - First local layer: Z-Y-Z on each qubit
+      - CX(q0 -> q1)
+      - Second local layer: Y-Z on each qubit
+      - CX(q1 -> q0)
+      - Final local Z on each qubit
+
+    This is inspired by generic SU(4) decompositions used in qMPS/brick-wall circuits.
+
+    Parameters:
+        qc: QuantumCircuit to append to
+        prefix: Prefix for parameter names (e.g., "tn_even", "tn_odd")
+        layer: Layer number in the ansatz
+        block_id: Block identifier within this layer
+        q0, q1: Qubit indices for this block
+    """
+    def p(name: str) -> Parameter:
+        return Parameter(f"{prefix}_{layer}_{block_id}_{name}")
+
+    # First local Z-Y-Z on q0
+    qc.rz(p("rz1_q0"), q0)
+    qc.ry(p("ry1_q0"), q0)
+    qc.rz(p("rz2_q0"), q0)
+
+    # First local Z-Y-Z on q1
+    qc.rz(p("rz1_q1"), q1)
+    qc.ry(p("ry1_q1"), q1)
+    qc.rz(p("rz2_q1"), q1)
+
+    # First entangling CX
+    qc.cx(q0, q1)
+
+    # Second local Y-Z on each
+    qc.ry(p("ry2_q0"), q0)
+    qc.rz(p("rz3_q0"), q0)
+
+    qc.ry(p("ry2_q1"), q1)
+    qc.rz(p("rz3_q1"), q1)
+
+    # Second entangling CX in opposite direction
+    qc.cx(q1, q0)
+
+    # Final Z rotations
+    qc.rz(p("rz4_q0"), q0)
+    qc.rz(p("rz4_q1"), q1)
+
+
+def apply_tn_block_np(
+    qc: QuantumCircuit,
+    prefix: str,
+    layer: int,
+    block_id: int,
+    q0: int,
+    q1: int,
+) -> None:
+    """
+    Append a 2-qubit number-preserving TN block (UNP gate).
+
+    Acts on {|01⟩, |10⟩} subspace only, preserving particle number.
+
+    Matrix form:
+        [1,        0,           0,           0]
+        [0,   cos(θ),    i·sin(θ),           0]
+        [0,   i·sin(θ),    cos(θ),           0]
+        [0,        0,           0,    exp(i·φ)]
+
+    Parameters:
+        qc: QuantumCircuit to append to
+        prefix: Prefix for parameter names
+        layer: Layer number
+        block_id: Block identifier
+        q0, q1: Qubit indices
+    """
+    def p(name: str) -> Parameter:
+        return Parameter(f"{prefix}_{layer}_{block_id}_{name}")
+
+    theta = p("theta")
+    phi = p("phi")
+
+    # UNP gate decomposition (same as np_hva)
+    qc.crz(phi, q0, q1)
+    qc.h(q1)
+    qc.cx(q1, q0)
+    qc.ry(theta, q0)
+    qc.cx(q1, q0)
+    qc.h(q1)
+
+
+def build_ansatz_tn_mps_sshh(L: int, reps: int) -> QuantumCircuit:
+    """
+    Tensor-network-inspired quantum-circuit MPS (qMPS) ansatz for SSH-Hubbard.
+
+    Layout:
+      - n_qubits = 2 * L (spin up/down per site)
+      - Repeated 'reps' times:
+        * single-qubit rotations on each qubit
+        * an 'even' brick of 2-qubit TN blocks
+        * an 'odd' brick of 2-qubit TN blocks
+
+    This is a global qMPS-like ansatz over all JW qubits with brick-wall structure.
+
+    Parameters:
+        L: Number of physical lattice sites
+        reps: Number of repetitions (depth) of the brick-wall pattern
+
+    Returns:
+        QuantumCircuit: The TN-MPS ansatz circuit with parameters
+    """
+    n_qubits = 2 * L
+    qc = QuantumCircuit(n_qubits)
+
+    for rep in range(reps):
+        # Local single-qubit layer
+        for q in range(n_qubits):
+            theta_ry = Parameter(f"tn_ry_{rep}_{q}")
+            theta_rz = Parameter(f"tn_rz_{rep}_{q}")
+            qc.ry(theta_ry, q)
+            qc.rz(theta_rz, q)
+
+        # Even brick: pairs (0,1), (2,3), (4,5), ...
+        block_id = 0
+        for q0 in range(0, n_qubits - 1, 2):
+            q1 = q0 + 1
+            apply_tn_block_su4_like(
+                qc,
+                prefix="tn_even",
+                layer=rep,
+                block_id=block_id,
+                q0=q0,
+                q1=q1,
+            )
+            block_id += 1
+
+        # Odd brick: pairs (1,2), (3,4), (5,6), ...
+        block_id = 0
+        for q0 in range(1, n_qubits - 1, 2):
+            q1 = q0 + 1
+            apply_tn_block_su4_like(
+                qc,
+                prefix="tn_odd",
+                layer=rep,
+                block_id=block_id,
+                q0=q0,
+                q1=q1,
+            )
+            block_id += 1
+
+    return qc
+
+
+def build_ansatz_tn_mps_np_sshh(L: int, reps: int) -> QuantumCircuit:
+    """
+    Number-preserving brick-wall TN ansatz for SSH-Hubbard.
+
+    Same layout as build_ansatz_tn_mps_sshh, but each 2-qubit block
+    is a number-preserving gate acting only on the {|01⟩, |10⟩} subspace.
+
+    This ensures strict particle number conservation throughout the circuit.
+
+    Parameters:
+        L: Number of physical lattice sites
+        reps: Number of repetitions (depth)
+
+    Returns:
+        QuantumCircuit: The number-preserving TN-MPS ansatz circuit
+    """
+    n_qubits = 2 * L
+    qc = QuantumCircuit(n_qubits)
+
+    for rep in range(reps):
+        # Local single-qubit layer (only Z rotations to preserve number)
+        for q in range(n_qubits):
+            theta_rz = Parameter(f"tn_np_rz_{rep}_{q}")
+            qc.rz(theta_rz, q)
+
+        # Even brick with number-preserving blocks
+        block_id = 0
+        for q0 in range(0, n_qubits - 1, 2):
+            q1 = q0 + 1
+            apply_tn_block_np(
+                qc,
+                prefix="tn_np_even",
+                layer=rep,
+                block_id=block_id,
+                q0=q0,
+                q1=q1,
+            )
+            block_id += 1
+
+        # Odd brick with number-preserving blocks
+        block_id = 0
+        for q0 in range(1, n_qubits - 1, 2):
+            q1 = q0 + 1
+            apply_tn_block_np(
+                qc,
+                prefix="tn_np_odd",
+                layer=rep,
+                block_id=block_id,
+                q0=q0,
+                q1=q1,
+            )
+            block_id += 1
+
+    return qc
+
+
+# ============================================================================
 # INITIAL STATE PREPARATION FOR NUMBER-CONSERVING ANSÄTZE
 # ============================================================================
 
@@ -1167,7 +1388,7 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
         L: Number of sites
         U: Hubbard interaction
         periodic: Boundary conditions
-        ansatz_kind: 'hea', 'hva', 'topoinsp', 'topo_rn', 'dqap', or 'np_hva'
+        ansatz_kind: 'hea', 'hva', 'topoinsp', 'topo_rn', 'dqap', 'np_hva', 'tn_mps', or 'tn_mps_np'
         reps: Ansatz depth
         deltas: Array of dimerization values
         optimizer: Qiskit optimizer instance
@@ -1199,7 +1420,7 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
         N = 2 * L
 
         # Build ansatz
-        number_conserving_ansatze = ['hva', 'dqap', 'np_hva']
+        number_conserving_ansatze = ['hva', 'dqap', 'np_hva', 'tn_mps_np']
         needs_initial_state = ansatz_kind in number_conserving_ansatze
 
         if ansatz_kind == 'hea':
@@ -1214,6 +1435,10 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
             ansatz = build_ansatz_dqap_sshh(L, reps, include_U=True)
         elif ansatz_kind == 'np_hva':
             ansatz = build_ansatz_np_hva_sshh(L, reps)
+        elif ansatz_kind == 'tn_mps':
+            ansatz = build_ansatz_tn_mps_sshh(L, reps)
+        elif ansatz_kind == 'tn_mps_np':
+            ansatz = build_ansatz_tn_mps_np_sshh(L, reps)
         else:
             raise ValueError(f"Unknown ansatz: {ansatz_kind}")
 
@@ -1313,7 +1538,8 @@ Examples:
     )
 
     parser.add_argument('--ansatz', type=str, default='hea',
-                       choices=['hea', 'hva', 'topoinsp', 'topo_rn', 'dqap', 'np_hva'],
+                       choices=['hea', 'hva', 'topoinsp', 'topo_rn', 'dqap', 'np_hva',
+                               'tn_mps', 'tn_mps_np'],
                        help='Ansatz type (default: hea)')
     parser.add_argument('--reps', type=int, default=3,
                        help='Ansatz depth/repetitions (default: 3)')
@@ -1438,7 +1664,7 @@ Examples:
     print(f"\n--- Building {args.ansatz.upper()} Ansatz ---")
 
     # Determine if this ansatz needs initial state preparation (number-conserving)
-    number_conserving_ansatze = ['hva', 'dqap', 'np_hva']
+    number_conserving_ansatze = ['hva', 'dqap', 'np_hva', 'tn_mps_np']
     needs_initial_state = args.ansatz in number_conserving_ansatze
 
     if args.ansatz == 'hea':
@@ -1453,6 +1679,10 @@ Examples:
         ansatz = build_ansatz_dqap_sshh(L, args.reps, include_U=True)
     elif args.ansatz == 'np_hva':
         ansatz = build_ansatz_np_hva_sshh(L, args.reps)
+    elif args.ansatz == 'tn_mps':
+        ansatz = build_ansatz_tn_mps_sshh(L, args.reps)
+    elif args.ansatz == 'tn_mps_np':
+        ansatz = build_ansatz_tn_mps_np_sshh(L, args.reps)
     else:
         raise ValueError(f"Unknown ansatz: {args.ansatz}")
 

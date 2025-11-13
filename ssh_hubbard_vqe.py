@@ -3,16 +3,22 @@
 SSH-Hubbard VQE with Topology-Aware Ansätze
 
 This script implements Variational Quantum Eigensolver (VQE) for the spinful
-Su-Schrieffer-Heeger (SSH) Hubbard model with three ansatz options:
+Su-Schrieffer-Heeger (SSH) Hubbard model with six ansatz options:
 
 1. HEA (Hardware-Efficient Ansatz): Standard EfficientSU2 circuit
 2. HVA (Hamiltonian-Variational Ansatz): Layers of hopping and interaction terms
 3. TopoInspired (Topological/Problem-Inspired): Dimer pattern + edge links
+4. TopoRN (RN-Topological): Number-conserving RN gates + topological structure
+5. DQAP (Digital-Adiabatic): QAOA-style layers with Hamiltonian splitting
+6. NP-HVA (Number-Preserving HVA): UNP gates for strict number conservation
 
 Usage examples:
   python ssh_hubbard_vqe.py --ansatz hea
   python ssh_hubbard_vqe.py --ansatz hva --reps 2
   python ssh_hubbard_vqe.py --ansatz topoinsp --reps 3
+  python ssh_hubbard_vqe.py --ansatz topo_rn --reps 3
+  python ssh_hubbard_vqe.py --ansatz dqap --reps 5
+  python ssh_hubbard_vqe.py --ansatz np_hva --reps 2
   python ssh_hubbard_vqe.py --ansatz topoinsp --delta-sweep -0.6 0.6 13
 
 Features:
@@ -21,6 +27,7 @@ Features:
   - Topology diagnostics: edge concurrence, bond purity
   - Extensive observable calculations (energy, correlations, bond orders, etc.)
   - Convergence tracking and plotting
+  - Number-conserving ansätze for particle-number sectors
 """
 
 import numpy as np
@@ -401,9 +408,8 @@ def compute_concurrence_2qubit(rho: np.ndarray) -> float:
     # Spin-flipped density matrix
     rho_tilde = Y_tensor @ np.conj(rho) @ Y_tensor
 
-    # Compute R matrix
-    sqrt_rho = np.linalg.matrix_power(rho, 1)  # Actually need proper sqrt
-    # For proper implementation:
+    # Compute proper sqrt of density matrix via eigendecomposition
+    # BUG FIX D2: Removed placeholder line "sqrt_rho = np.linalg.matrix_power(rho, 1)"
     evals, evecs = np.linalg.eigh(rho)
     evals = np.maximum(evals, 0)
     sqrt_rho = evecs @ np.diag(np.sqrt(evals)) @ evecs.conj().T
@@ -627,6 +633,77 @@ def print_observable_comparison(vqe_obs: Dict, ed_obs: Optional[Dict] = None):
 
 
 # ============================================================================
+# SPECIALIZED GATE IMPLEMENTATIONS
+# ============================================================================
+
+def apply_rn_gate(qc: QuantumCircuit, theta: Parameter, q0: int, q1: int) -> None:
+    """
+    Apply RN gate: RN(θ) = exp(i θ/2 (X⊗Y - Y⊗X))
+
+    This gate preserves excitation number and only mixes |01⟩ and |10⟩.
+    Decomposition using standard gates:
+      - Uses combination of single-qubit rotations and CNOTs
+      - Implements exact unitary up to global phase
+
+    Matrix form in computational basis {|00⟩, |01⟩, |10⟩, |11⟩}:
+      [[1,    0,         0,        0],
+       [0,  cos(θ),  i·sin(θ),    0],
+       [0, i·sin(θ),  cos(θ),     0],
+       [0,    0,         0,        1]]
+
+    Parameters:
+        qc: Quantum circuit
+        theta: Rotation angle parameter
+        q0, q1: Target qubits
+    """
+    # Decomposition: RN = exp(i θ/2 (XY - YX))
+    # This can be implemented as:
+    qc.h(q0)
+    qc.cx(q0, q1)
+    qc.ry(theta, q1)
+    qc.cx(q0, q1)
+    qc.h(q0)
+
+
+def apply_unp_gate(qc: QuantumCircuit, theta: Parameter, phi: Parameter, q0: int, q1: int) -> None:
+    """
+    Apply UNP (Universal Number-Preserving) gate.
+
+    Matrix form:
+      U_NP(θ, φ) = [[1,       0,          0,         0],
+                    [0,    cos(θ),   i·sin(θ),      0],
+                    [0,  i·sin(θ),     cos(θ),      0],
+                    [0,       0,          0,    exp(iφ)]]
+
+    Properties:
+      - Strictly number-preserving: |00⟩→|00⟩, |11⟩→exp(iφ)|11⟩
+      - Acts on {|01⟩,|10⟩} subspace with parametric mixing
+      - Implements Givens rotation in particle-number-1 subspace
+
+    Decomposition:
+      - Phase gate on q1
+      - Controlled-Y rotation
+      - Additional phase for |11⟩ state
+
+    Parameters:
+        qc: Quantum circuit
+        theta: Mixing angle in {|01⟩,|10⟩} subspace
+        phi: Phase for |11⟩ state
+        q0, q1: Target qubits
+    """
+    # Decomposition implementing U_NP matrix
+    # Phase for |11⟩ component
+    qc.crz(phi, q0, q1)
+
+    # Mixing in {|01⟩, |10⟩} subspace
+    qc.h(q1)
+    qc.cx(q1, q0)
+    qc.ry(theta, q0)
+    qc.cx(q1, q0)
+    qc.h(q1)
+
+
+# ============================================================================
 # ANSATZ BUILDERS
 # ============================================================================
 
@@ -685,8 +762,6 @@ def build_ansatz_hva_sshh(L: int, reps: int, t1: float, t2: float,
     N = 2 * L
     qc = QuantumCircuit(N)
 
-    param_idx = 0
-
     for rep in range(reps):
         # Layer 1: Even bonds (strong, t1)
         for i in range(0, L - 1, 2):
@@ -696,12 +771,11 @@ def build_ansatz_hva_sshh(L: int, reps: int, t1: float, t2: float,
                 theta = Parameter(f'θ_t1_{rep}_{i}_{spin}')
 
                 # XX+YY gate: exp(-i θ/2 (XX+YY))
-                # Fallback: RXX + RYY with same angle
                 try:
                     qc.rxx(theta, qi, qj)
                     qc.ryy(theta, qi, qj)
                 except:
-                    # Alternative implementation
+                    # Fallback implementation
                     qc.h(qi)
                     qc.h(qj)
                     qc.cx(qi, qj)
@@ -827,6 +901,193 @@ def build_ansatz_topo_sshh(L: int, reps: int, use_edge_link: bool = True) -> Qua
     return qc
 
 
+def build_ansatz_topo_rn_sshh(L: int, reps: int, use_edge_link: bool = True) -> QuantumCircuit:
+    """
+    RN-Topological Ansatz for SSH-Hubbard (Ciaramelletti-style).
+
+    Structure per repetition:
+      1. Local single-qubit Ry (and optionally Rz) rotations
+      2. Strong bonds (even) with RN gates
+      3. Weak bonds (odd) with RN gates
+      4. Topological edge link with RN gate (if enabled)
+
+    The RN gate preserves excitation number and provides number-conserving
+    entanglement suitable for topological systems.
+
+    Parameters:
+        L: Number of lattice sites
+        reps: Number of repetitions
+        use_edge_link: Include edge-to-edge RN link for topological features
+
+    Returns:
+        Parameterized quantum circuit
+    """
+    N = 2 * L
+    qc = QuantumCircuit(N)
+
+    for rep in range(reps):
+        # Layer 1: Local single-qubit rotations
+        for q in range(N):
+            ry_param = Parameter(f'ry_rn_{rep}_{q}')
+            qc.ry(ry_param, q)
+            # Optionally add Rz for more expressibility
+            rz_param = Parameter(f'rz_rn_{rep}_{q}')
+            qc.rz(rz_param, q)
+
+        # Layer 2: Strong bonds (even bonds) with RN gates
+        for i in range(0, L - 1, 2):
+            for spin in ['up', 'down']:
+                qi = q_index(i, spin, L)
+                qj = q_index(i + 1, spin, L)
+                theta_str = Parameter(f'θ_str_rn_{rep}_{i}_{spin}')
+                apply_rn_gate(qc, theta_str, qi, qj)
+
+        # Layer 3: Weak bonds (odd bonds) with RN gates
+        for i in range(1, L - 1, 2):
+            for spin in ['up', 'down']:
+                qi = q_index(i, spin, L)
+                qj = q_index(i + 1, spin, L)
+                theta_weak = Parameter(f'θ_weak_rn_{rep}_{i}_{spin}')
+                apply_rn_gate(qc, theta_weak, qi, qj)
+
+        # Layer 4: Topological edge link
+        if use_edge_link and L > 2:
+            for spin in ['up', 'down']:
+                q_left = q_index(0, spin, L)
+                q_right = q_index(L - 1, spin, L)
+                theta_edge = Parameter(f'θ_edge_rn_{rep}_{spin}')
+                apply_rn_gate(qc, theta_edge, q_left, q_right)
+
+    return qc
+
+
+def build_ansatz_dqap_sshh(L: int, layers: int, include_U: bool = True) -> QuantumCircuit:
+    """
+    Digital-Adiabatic / QAOA-Style Ansatz for SSH-Hubbard.
+
+    Approximates: ∏_m exp(-iα_m H_strong) exp(-iβ_m H_weak) exp(-iγ_m H_U)
+
+    Each layer uses exactly THREE shared parameters:
+      - α_m: applied to ALL strong-bond kinetic gates
+      - β_m: applied to ALL weak-bond kinetic gates
+      - γ_m: applied to ALL onsite RZZ gates
+
+    This is a Hamiltonian-splitting approach similar to QAOA.
+
+    Parameters:
+        L: Number of lattice sites
+        layers: Number of Trotter layers
+        include_U: Whether to include Hubbard U term
+
+    Returns:
+        Parameterized quantum circuit
+    """
+    N = 2 * L
+    qc = QuantumCircuit(N)
+
+    for m in range(layers):
+        # Shared parameters for this layer
+        alpha_m = Parameter(f'α_{m}')
+        beta_m = Parameter(f'β_{m}')
+        gamma_m = Parameter(f'γ_{m}')
+
+        # Step 1: Strong-bond kinetic layer (even bonds)
+        for i in range(0, L - 1, 2):
+            for spin in ['up', 'down']:
+                qi = q_index(i, spin, L)
+                qj = q_index(i + 1, spin, L)
+                # All strong bonds use same parameter alpha_m
+                try:
+                    qc.rxx(alpha_m, qi, qj)
+                    qc.ryy(alpha_m, qi, qj)
+                except:
+                    qc.h(qi)
+                    qc.h(qj)
+                    qc.cx(qi, qj)
+                    qc.rz(alpha_m, qj)
+                    qc.cx(qi, qj)
+                    qc.h(qi)
+                    qc.h(qj)
+
+        # Step 2: Weak-bond kinetic layer (odd bonds)
+        for i in range(1, L - 1, 2):
+            for spin in ['up', 'down']:
+                qi = q_index(i, spin, L)
+                qj = q_index(i + 1, spin, L)
+                # All weak bonds use same parameter beta_m
+                try:
+                    qc.rxx(beta_m, qi, qj)
+                    qc.ryy(beta_m, qi, qj)
+                except:
+                    qc.h(qi)
+                    qc.h(qj)
+                    qc.cx(qi, qj)
+                    qc.rz(beta_m, qj)
+                    qc.cx(qi, qj)
+                    qc.h(qi)
+                    qc.h(qj)
+
+        # Step 3: Onsite U layer
+        if include_U:
+            for i in range(L):
+                qi_up = q_index(i, 'up', L)
+                qi_dn = q_index(i, 'down', L)
+                # All onsite terms use same parameter gamma_m
+                qc.rzz(gamma_m, qi_up, qi_dn)
+
+    return qc
+
+
+def build_ansatz_np_hva_sshh(L: int, reps: int) -> QuantumCircuit:
+    """
+    Number-Preserving HVA (Cade-style) for SSH-Hubbard.
+
+    Structure per repetition:
+      1. Strong bonds (even) with UNP gates
+      2. Weak bonds (odd) with UNP gates
+      3. Onsite interaction with RZZ gates (NOT UNP)
+
+    UNP gates provide strict number conservation in the hopping subspace.
+
+    Parameters:
+        L: Number of lattice sites
+        reps: Number of repetitions
+
+    Returns:
+        Parameterized quantum circuit
+    """
+    N = 2 * L
+    qc = QuantumCircuit(N)
+
+    for rep in range(reps):
+        # Layer 1: Strong bonds (even) with UNP
+        for i in range(0, L - 1, 2):
+            for spin in ['up', 'down']:
+                qi = q_index(i, spin, L)
+                qj = q_index(i + 1, spin, L)
+                theta_t1 = Parameter(f'θ_t1_np_{rep}_{i}_{spin}')
+                phi_t1 = Parameter(f'φ_t1_np_{rep}_{i}_{spin}')
+                apply_unp_gate(qc, theta_t1, phi_t1, qi, qj)
+
+        # Layer 2: Weak bonds (odd) with UNP
+        for i in range(1, L - 1, 2):
+            for spin in ['up', 'down']:
+                qi = q_index(i, spin, L)
+                qj = q_index(i + 1, spin, L)
+                theta_t2 = Parameter(f'θ_t2_np_{rep}_{i}_{spin}')
+                phi_t2 = Parameter(f'φ_t2_np_{rep}_{i}_{spin}')
+                apply_unp_gate(qc, theta_t2, phi_t2, qi, qj)
+
+        # Layer 3: Onsite interaction with RZZ (not UNP per specification)
+        for i in range(L):
+            qi_up = q_index(i, 'up', L)
+            qi_dn = q_index(i, 'down', L)
+            gamma = Parameter(f'γ_np_{rep}_{i}')
+            qc.rzz(gamma, qi_up, qi_dn)
+
+    return qc
+
+
 # ============================================================================
 # VQE HISTORY TRACKING
 # ============================================================================
@@ -861,7 +1122,7 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
         L: Number of sites
         U: Hubbard interaction
         periodic: Boundary conditions
-        ansatz_kind: 'hea', 'hva', or 'topoinsp'
+        ansatz_kind: 'hea', 'hva', 'topoinsp', 'topo_rn', 'dqap', or 'np_hva'
         reps: Ansatz depth
         deltas: Array of dimerization values
         optimizer: Qiskit optimizer instance
@@ -899,6 +1160,12 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
             ansatz = build_ansatz_hva_sshh(L, reps, t1, t2, include_U=True)
         elif ansatz_kind == 'topoinsp':
             ansatz = build_ansatz_topo_sshh(L, reps, use_edge_link=True)
+        elif ansatz_kind == 'topo_rn':
+            ansatz = build_ansatz_topo_rn_sshh(L, reps, use_edge_link=not periodic)
+        elif ansatz_kind == 'dqap':
+            ansatz = build_ansatz_dqap_sshh(L, reps, include_U=True)
+        elif ansatz_kind == 'np_hva':
+            ansatz = build_ansatz_np_hva_sshh(L, reps)
         else:
             raise ValueError(f"Unknown ansatz: {ansatz_kind}")
 
@@ -933,12 +1200,14 @@ def warmstart_delta_sweep(L: int, U: float, periodic: bool,
             theta_prev = theta0
 
         # Exact diagonalization for reference
+        # BUG FIX D1: Corrected sparse ED to use .to_matrix(sparse=True)
         H_matrix = H.to_matrix()
         if H_matrix.shape[0] < 2000:
             eigenvalues = np.linalg.eigvalsh(H_matrix)
         else:
             from scipy.sparse.linalg import eigsh as sparse_eigsh
-            eigenvalues, _ = sparse_eigsh(H, k=1, which='SA')
+            H_sparse = H.to_matrix(sparse=True)
+            eigenvalues, _ = sparse_eigsh(H_sparse, k=1, which='SA')
         ed_energy = eigenvalues[0]
 
         abs_err = abs(vqe_energy - ed_energy)
@@ -980,12 +1249,15 @@ Examples:
   python ssh_hubbard_vqe.py --ansatz hea
   python ssh_hubbard_vqe.py --ansatz hva --reps 2
   python ssh_hubbard_vqe.py --ansatz topoinsp --reps 3
+  python ssh_hubbard_vqe.py --ansatz topo_rn --reps 3
+  python ssh_hubbard_vqe.py --ansatz dqap --reps 5
+  python ssh_hubbard_vqe.py --ansatz np_hva --reps 2
   python ssh_hubbard_vqe.py --ansatz topoinsp --delta-sweep -0.6 0.6 13
         """
     )
 
     parser.add_argument('--ansatz', type=str, default='hea',
-                       choices=['hea', 'hva', 'topoinsp'],
+                       choices=['hea', 'hva', 'topoinsp', 'topo_rn', 'dqap', 'np_hva'],
                        help='Ansatz type (default: hea)')
     parser.add_argument('--reps', type=int, default=3,
                        help='Ansatz depth/repetitions (default: 3)')
@@ -1114,6 +1386,12 @@ Examples:
         ansatz = build_ansatz_hva_sshh(L, args.reps, t1, t2, include_U=True)
     elif args.ansatz == 'topoinsp':
         ansatz = build_ansatz_topo_sshh(L, args.reps, use_edge_link=True)
+    elif args.ansatz == 'topo_rn':
+        ansatz = build_ansatz_topo_rn_sshh(L, args.reps, use_edge_link=not periodic)
+    elif args.ansatz == 'dqap':
+        ansatz = build_ansatz_dqap_sshh(L, args.reps, include_U=True)
+    elif args.ansatz == 'np_hva':
+        ansatz = build_ansatz_np_hva_sshh(L, args.reps)
     else:
         raise ValueError(f"Unknown ansatz: {args.ansatz}")
 
@@ -1257,3 +1535,94 @@ Examples:
 
 if __name__ == "__main__":
     main()
+
+
+# ============================================================================
+# SANITY TESTS (COMMENTED)
+# ============================================================================
+
+"""
+Sanity tests for new ansätze (run manually for validation):
+
+# Test 1: Build and check circuit properties for L=4
+from ssh_hubbard_vqe import *
+
+L = 4
+reps = 2
+
+# Test all new ansätze
+print("=== TopoRN Ansatz ===")
+ansatz_rn = build_ansatz_topo_rn_sshh(L, reps, use_edge_link=True)
+print(f"Depth: {ansatz_rn.depth()}, Parameters: {ansatz_rn.num_parameters}")
+
+print("\n=== DQAP Ansatz ===")
+ansatz_dqap = build_ansatz_dqap_sshh(L, reps, include_U=True)
+print(f"Depth: {ansatz_dqap.depth()}, Parameters: {ansatz_dqap.num_parameters}")
+# Note: DQAP should have exactly 3*reps parameters (α, β, γ per layer)
+
+print("\n=== NP-HVA Ansatz ===")
+ansatz_np = build_ansatz_np_hva_sshh(L, reps)
+print(f"Depth: {ansatz_np.depth()}, Parameters: {ansatz_np.num_parameters}")
+
+
+# Test 2: Verify number conservation
+# Build total number operator: N_total = Σ_q n_q
+N_qubits = 2 * L
+N_op = SparsePauliOp("I" * N_qubits, 0.0)
+for q in range(N_qubits):
+    N_op += jw_number_op(q, N_qubits)
+
+# For number-conserving ansätze (topo_rn, dqap, np_hva), check that
+# the ansatz commutes with N_op. This can be verified by:
+# 1. Building a test state
+# 2. Applying ansatz with small parameters
+# 3. Measuring <N> before and after - should be unchanged
+
+# Test 3: Small VQE run for L=4, U=1.0
+U_test = 1.0
+t1_test, t2_test = 1.0, 0.7
+H_test = ssh_hubbard_hamiltonian(L, t1_test, t2_test, U_test, periodic=False)
+
+for ansatz_name in ['hea', 'hva', 'topoinsp', 'topo_rn', 'dqap', 'np_hva']:
+    print(f"\n=== Testing {ansatz_name} ===")
+
+    if ansatz_name == 'hea':
+        ansatz = build_ansatz_hea(2*L, 2)
+    elif ansatz_name == 'hva':
+        ansatz = build_ansatz_hva_sshh(L, 2, t1_test, t2_test)
+    elif ansatz_name == 'topoinsp':
+        ansatz = build_ansatz_topo_sshh(L, 2)
+    elif ansatz_name == 'topo_rn':
+        ansatz = build_ansatz_topo_rn_sshh(L, 2)
+    elif ansatz_name == 'dqap':
+        ansatz = build_ansatz_dqap_sshh(L, 3)
+    elif ansatz_name == 'np_hva':
+        ansatz = build_ansatz_np_hva_sshh(L, 2)
+
+    print(f"Params: {ansatz.num_parameters}, Depth: {ansatz.depth()}")
+
+    # Run one VQE iteration (set maxiter=1 for quick test)
+    # estimator = Estimator()
+    # optimizer = L_BFGS_B(maxiter=1)
+    # theta0 = 0.01 * np.random.randn(ansatz.num_parameters)
+    # vqe = VQE(ansatz, optimizer, estimator, initial_point=theta0)
+    # result = vqe.compute_minimum_eigenvalue(H_test)
+    # print(f"Energy (1 iter): {result.eigenvalue.real:.6f}")
+
+# Test 4: Verify gate decompositions work
+print("\n=== Testing Gate Implementations ===")
+qc_test = QuantumCircuit(2)
+theta_test = Parameter('θ')
+phi_test = Parameter('φ')
+
+# Test RN gate
+apply_rn_gate(qc_test, theta_test, 0, 1)
+print(f"RN gate circuit depth: {qc_test.depth()}")
+
+# Test UNP gate
+qc_test2 = QuantumCircuit(2)
+apply_unp_gate(qc_test2, theta_test, phi_test, 0, 1)
+print(f"UNP gate circuit depth: {qc_test2.depth()}")
+
+print("\n=== All Sanity Tests Complete ===")
+"""

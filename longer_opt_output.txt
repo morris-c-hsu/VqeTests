@@ -47,3 +47,9 @@ ANSATZ: TN_MPS_FIXED
 ================================================================================
 
   Running with maxiter=200...
+    Energy:       -3.3701051161
+    Error:        0.640609 (15.972%)
+    Evaluations:  15024
+    Runtime:      485.99s
+
+  Running with maxiter=500...

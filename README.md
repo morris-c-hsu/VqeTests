@@ -6,7 +6,7 @@ This project implements two complementary approaches for studying the SSH-Hubbar
 2. **DMRG (Density Matrix Renormalization Group)**: Approximate classical solver for larger systems (L ≥ 8)
 3. **VQE (Variational Quantum Eigensolver)**: Quantum-inspired algorithm with topology-aware ansätze
 
-## ⚠️ Limitations and Scope
+## Limitations and Scope
 
 ### What This Repository Provides:
 - Working VQE implementation for SSH-Hubbard model
@@ -23,7 +23,7 @@ This project implements two complementary approaches for studying the SSH-Hubbar
 - Exact diagonalization impossible for L≥8 (requires >68GB RAM for L=8)
 
 **2. DMRG Issues**
-- ⚠️ **CRITICAL:** DMRG energies show 1-3% offset compared to exact diagonalization
+- **CRITICAL:** DMRG energies show 1-3% offset compared to exact diagonalization
 - This offset does NOT improve with bond dimension → indicates Hamiltonian construction mismatch
 - Root cause under investigation: likely unit cell interpretation, bond pattern ordering, or Jordan-Wigner convention differences
 - **DMRG results cannot serve as exact benchmarks**
@@ -266,7 +266,7 @@ Energy per site:     -0.8039094648
 Circuit depth:  42
 Parameters:     78
 Qubits:         12
-✓ Circuit saved to ../results/L6_topoinsp_circuit.png
+Circuit saved to ../results/L6_topoinsp_circuit.png
 
 --- Running VQE Optimization ---
 

@@ -10,26 +10,26 @@ Research prototype implementing variational quantum eigensolver (VQE) methods fo
 
 ---
 
-## 🎯 Implementation Status
+## Implementation Status
 
 **Completed:**
-- ✅ **8 distinct ansätze** implemented for L≤6 systems
-- ✅ **Several bugs fixed**: Pauli indexing, qubit layout, Jordan-Wigner coefficients
-- ✅ **Vacuum state trap** discovered and resolved (+14% accuracy improvement)
-- ✅ **L=6 benchmarks** completed across 3 parameter regimes
-- ✅ **Best-performing ansatz on L=6**: NP_HVA (0.77%-17.75% errors across regimes)
-- ✅ **VQE Hamiltonian verification**: Main implementations produce consistent matrices
+- **8 distinct ansätze** implemented for L≤6 systems
+- **Several bugs fixed**: Pauli indexing, qubit layout, Jordan-Wigner coefficients
+- **Vacuum state trap** discovered and resolved (+14% accuracy improvement)
+- **L=6 benchmarks** completed across 3 parameter regimes
+- **Best-performing ansatz on L=6**: NP_HVA (0.77%-17.75% errors across regimes)
+- **VQE Hamiltonian verification**: Main implementations produce consistent matrices
 
 **Known Issues (Not Fixed):**
-- ⚠️ **DMRG Hamiltonian mismatch**: 1-3% systematic energy offset (does not improve with χ)
-- ⚠️ **HVA fallback bug**: May implement wrong physics (ZZ instead of XX+YY) on older Qiskit
-- ⚠️ **Number-preserving gates**: [U,N̂]=0 property not validated via tests
-- ⚠️ **No noise modeling**: Ideal statevector simulation only
-- ⚠️ **Limited validation**: Only L≤6 verified; no literature comparison
+- **DMRG Hamiltonian mismatch**: 1-3% systematic energy offset (does not improve with χ)
+- **HVA fallback bug**: May implement wrong physics (ZZ instead of XX+YY) on older Qiskit
+- **Number-preserving gates**: [U,N̂]=0 property not validated via tests
+- **No noise modeling**: Ideal statevector simulation only
+- **Limited validation**: Only L≤6 verified; no literature comparison
 
 ---
 
-## 📁 Files Implemented
+## Files Implemented
 
 ### Core VQE Implementation
 1. **`ssh_hubbard_vqe.py`** (2,300+ lines)
@@ -37,7 +37,7 @@ Research prototype implementing variational quantum eigensolver (VQE) methods fo
    - Verified Pauli string indexing
    - All ansätze tested and benchmarked
 
-2. **`ssh_hubbard_tn_vqe.py`** (656 lines) ⚠️ **FIXED**
+2. **`ssh_hubbard_tn_vqe.py`** (656 lines) **FIXED**
    - Standalone tensor-network brick-wall VQE
    - **Fixed**: Pauli indexing (rightmost = qubit 0)
    - **Fixed**: Qubit layout (interleaved instead of separate banks)
@@ -45,7 +45,7 @@ Research prototype implementing variational quantum eigensolver (VQE) methods fo
    - Now produces identical Hamiltonians to main implementation
 
 ### Benchmarking & Testing
-3. **`benchmark_large_systems.py`** (NEW) ⚠️ **FIXED**
+3. **`benchmark_large_systems.py`** (NEW) **FIXED**
    - Comprehensive L=6 and L=8 benchmark suite
    - Tests all 8 ansätze across multiple regimes
    - **Fixed**: TN_MPS now gets initial state (avoids vacuum trap)
@@ -84,7 +84,7 @@ Research prototype implementing variational quantum eigensolver (VQE) methods fo
 
 ---
 
-## 🧬 Ansatz Library (8 Total)
+## Ansatz Library (8 Total)
 
 ### Circuit Diagrams
 
@@ -166,7 +166,7 @@ Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/
 
 **5. DQAP - Differentiable Quantum Architecture Plus**
 - Type: Minimal parameterization with chemistry-inspired gates
-- Parameters: **6 only** (L=6) ⚡
+- Parameters: **6 only** (L=6)
 - L=6 Performance:
   - Standard: 23.83% error in 4.4s
   - Weak SSH: 30.16% error in 3.2s
@@ -184,7 +184,7 @@ Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/
 - Best for: Observed best performance across tested regimes (L=6 only)
 - Notes: Moderate cost (~170s), designed to preserve particle number (formal verification pending)
 
-### Tensor Network Ansätze (2) ⚠️ **FIXED**
+### Tensor Network Ansätze (2) **FIXED**
 
 **7. TN_MPS - Tensor Network MPS (qMPS)**
 - Type: Brick-wall circuit with SU(4)-like 2-qubit blocks
@@ -209,14 +209,14 @@ Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/
 
 ---
 
-## 🔬 Comprehensive L=6 Benchmark Results
+## Comprehensive L=6 Benchmark Results
 
 ### System Configuration
 - **Sites**: L=6 (12 qubits)
 - **8 Ansätze**: All implemented ansätze tested
 - **VQE Settings**: maxiter=200, L-BFGS-B optimizer
 - **3 Parameter Regimes**: Standard, Weak SSH, Strong SSH
-- **Status**: ✅ All 3 tests completed successfully
+- **Status**: All 3 tests completed successfully
 
 ---
 
@@ -256,7 +256,7 @@ Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/
 | 8 | topoinsp | 39.12% | 1.779e+00 | 48 | 58s | -2.7681 |
 
 **Observations**:
-- ⚠️ **Hardest regime** - all ansätze have higher errors
+- **Hardest regime** - all ansätze have higher errors
 - Weak dimerization (δ=0.11) makes optimization more challenging
 - NP_HVA still dominates but with 17.75% error
 - TN_MPS_NP outperforms TN_MPS in this regime
@@ -285,7 +285,7 @@ Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/
 
 ---
 
-## 📊 Cross-Regime Analysis
+## Cross-Regime Analysis
 
 ### Regime Difficulty Ranking
 1. **Strong SSH (δ=0.67)**: Easiest - NP_HVA achieves 0.77%
@@ -304,7 +304,7 @@ Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/
 | hea | 23.44% | 37.92% | 19.18% | 26.85% | Medium |
 | topo_rn | 22.09% | 27.02% | 29.49% | 26.20% | Slow |
 | tn_mps_np | 23.68% | 22.84% | 19.71% | 22.08% | Medium |
-| dqap ⚡ | 23.83% | 30.16% | 19.63% | 24.54% | **Very Fast** |
+| dqap | 23.83% | 30.16% | 19.63% | 24.54% | **Very Fast** |
 | topoinsp | 32.09% | 39.12% | 44.98% | 38.73% | Fast |
 
 ### Parameter Efficiency Comparison
@@ -347,7 +347,7 @@ Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/
 
 ---
 
-## 🐛 Critical Bug Fixes
+## Critical Bug Fixes
 
 ### Fix 1: Pauli String Indexing (ssh_hubbard_tn_vqe.py)
 
@@ -436,15 +436,15 @@ return SparsePauliOp([pauli_XX_str, pauli_YY_str], coeffs=[0.5, 0.5])
 
 ---
 
-## 🧪 Verification & Testing
+## Verification & Testing
 
 ### Hamiltonian Consistency Test
 **Tool**: `verify_hamiltonian_consistency.py`
 
 **Results**:
-- ✅ Matrix difference (Frobenius norm): **0.00e+00**
-- ✅ Ground state energies: Both give **-2.5703727848**
-- ✅ All Pauli terms match exactly
+- Matrix difference (Frobenius norm): **0.00e+00**
+- Ground state energies: Both give **-2.5703727848**
+- All Pauli terms match exactly
 
 **Test System**: L=4, t1=1.0, t2=0.5, U=2.0
 
@@ -458,7 +458,7 @@ return SparsePauliOp([pauli_XX_str, pauli_YY_str], coeffs=[0.5, 0.5])
 | Configuration | Energy | Error | Improvement |
 |--------------|---------|-------|-------------|
 | TN_MPS from vacuum | -3.2650 | 18.59% | baseline |
-| TN_MPS with half-filling | -3.3701 | 15.97% | **+14.1%** ✓ |
+| TN_MPS with half-filling | -3.3701 | 15.97% | **+14.1%** |
 
 **Conclusion**: Initial state preparation critical for TN_MPS
 
@@ -472,14 +472,14 @@ return SparsePauliOp([pauli_XX_str, pauli_YY_str], coeffs=[0.5, 0.5])
 | maxiter | Energy | Error | Runtime | Improvement |
 |---------|---------|-------|---------|-------------|
 | 200 | -3.7310 | 6.973% | 168s | baseline |
-| 500 | -3.7509 | **6.477%** | 222s | +7.1% ✓ |
+| 500 | -3.7509 | **6.477%** | 222s | +7.1% |
 | 1000 | *running* | - | - | - |
 
 **Finding**: Longer optimization helps, but with diminishing returns
 
 ---
 
-## 🔍 Key Insights & Discoveries
+## Key Insights & Discoveries
 
 **Validation context**: All insights based on L=6 benchmarks with exact diagonalization. Behavior at larger system sizes not yet characterized.
 
@@ -512,7 +512,7 @@ Strong SSH (δ=0.67) < Standard (δ=0.33) < Weak SSH (δ=0.11)
 
 ---
 
-## 🚀 Usage Guide
+## Usage Guide
 
 ### Quick Start - NP_HVA (Recommended)
 
@@ -574,11 +574,11 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-## 📈 Performance Scaling
+## Performance Scaling
 
 ### System Size Tested
 - **L=4**: All ansätze, multiple regimes (original benchmarks with exact validation)
-- **L=6**: All 8 ansätze, 3 regimes, comprehensive benchmarks with exact validation ✅
+- **L=6**: All 8 ansätze, 3 regimes, comprehensive benchmarks with exact validation
 - **L=8**: Attempted but exact diagonalization not feasible (Hilbert space too large)
 - **L>8**: DMRG available but has systematic offset (~1-3%); no exact validation possible
 
@@ -596,7 +596,7 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-## 📚 Complete File Reference
+## Complete File Reference
 
 ### Python Scripts
 1. `ssh_hubbard_vqe.py` - Main VQE (6 ansätze, verified)
@@ -620,7 +620,7 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-## 🎓 Observations from L=6 Benchmarks
+## Observations from L=6 Benchmarks
 
 **Important**: These conclusions are based on L=6 systems only. Generalization to larger systems not validated.
 
@@ -640,7 +640,7 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-## ✅ Implementation Status
+## Implementation Status
 
 - [x] All ansätze implemented and tested on L=6
 - [x] Critical bugs fixed and verified
@@ -661,7 +661,7 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-## 🔗 References
+## References
 
 **Branch**: `claude/dmrg-ssh-hubbard-lattice-011CV5aqeFEEksoyNARPj4Dw`
 
@@ -680,5 +680,5 @@ circuit.compose(ansatz_base, inplace=True)
 ---
 
 **Last Updated**: 2025-11-14
-**Implementation**: Verified for L ≤ 6 ✅
+**Implementation**: Verified for L ≤ 6
 **Best-Performing Ansatz (L=6)**: NP_HVA (0.77%-17.75% errors across three tested regimes)

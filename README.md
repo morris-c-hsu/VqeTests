@@ -2,8 +2,24 @@
 
 This project implements two complementary approaches for studying the SSH-Hubbard model on 1D lattices:
 
-1. **DMRG (Density Matrix Renormalization Group)**: Classical exact diagonalization for up to 8 sites
-2. **VQE (Variational Quantum Eigensolver)**: Quantum-inspired algorithm with topology-aware ansätze
+1. **Exact Diagonalization (ED)**: Full Hilbert-space diagonalization for small systems (L ≤ 6)
+2. **DMRG (Density Matrix Renormalization Group)**: Approximate classical solver for larger systems (L ≥ 8)
+3. **VQE (Variational Quantum Eigensolver)**: Quantum-inspired algorithm with topology-aware ansätze
+
+## Scope and Limitations
+
+**Validation Status:**
+- **Exact validation available only for L ≤ 6** (12 qubits after Jordan-Wigner transformation)
+- For larger systems (L ≥ 8), DMRG provides approximate reference energies with a known systematic offset (~1–3%)
+- DMRG results should be treated as approximate, not exact benchmarks
+
+**Current Limitations:**
+- All VQE results based on statevector simulation (no noise modeling)
+- No hardware experiments
+- Single-run optimizations (no statistical error bars)
+- Number-preserving ansätze: gate-level commutation with total number operator not yet formally verified
+- Performance metrics do not necessarily generalize to larger systems
+- DMRG systematic offset under investigation (likely Hamiltonian convention mismatch)
 
 ## Physics Background
 
@@ -33,7 +49,7 @@ where:
 
 ### Key Features
 
-1. **Exact Diagonalization**: For 8 sites (Hilbert space dimension 4^8 = 65,536), the code uses exact diagonalization to find the ground state.
+1. **Exact Diagonalization**: For small systems (L ≤ 6), the code uses full Hilbert-space exact diagonalization to find the ground state. This is the only regime with exact validation.
 
 2. **Operator Construction**: Implements fermionic creation/annihilation operators with proper anticommutation relations.
 
@@ -46,7 +62,7 @@ where:
 
 - `SpinOperators`: Defines single-site operators (creation, annihilation, number operators)
 - `SSHHubbardHamiltonian`: Constructs the full Hamiltonian matrix
-- `DMRG`: Main DMRG class (uses exact diagonalization for L ≤ 8)
+- `DMRG`: Main class (uses exact diagonalization for L ≤ 6; approximate DMRG for larger systems)
 - `main()`: Runs the simulation and displays results
 
 ## Installation
@@ -134,12 +150,14 @@ The warm-start feature uses the optimal parameters from each δ point as the ini
 
 ## Features
 
-### Exact Diagonalization Benchmarking
+### Benchmarking (L ≤ 6 only)
 
-Every VQE run includes exact diagonalization for validation:
+VQE runs for L ≤ 6 include exact diagonalization for validation:
 - Ground state energy comparison
 - Observable-by-observable error analysis
 - Convergence tracking against ED baseline
+
+For L ≥ 8, exact validation is not available. DMRG can provide approximate reference values (with known systematic offset).
 
 ### Comprehensive Observables
 
@@ -267,11 +285,13 @@ The SSH model exhibits a topological phase transition at δ=0:
 
 ### Ansatz Comparison
 
+Observed performance on L=6 benchmarks (single-run results, no statistics):
+
 **HEA**: Fast convergence, general-purpose, but may miss topology-specific features
 
-**HVA**: Best for capturing interaction physics (U term), preserves symmetries, moderate parameter count
+**HVA**: Good for capturing interaction physics (U term), designed to preserve symmetries, moderate parameter count
 
-**TopoInspired**: Optimized for SSH topology, explicit edge links capture topological features, best for δ sweeps across phase transition
+**TopoInspired**: Designed for SSH topology, explicit edge links capture topological features, performance varies across regimes
 
 ## Advanced Usage
 
@@ -320,10 +340,11 @@ Fermions mapped to qubits with Jordan-Wigner transformation:
 
 ### Number Conservation
 
-HVA and TopoInspired ansätze preserve total particle number:
+HVA and TopoInspired ansätze are designed to preserve total particle number:
 - No single-qubit X/Y gates (would change occupation)
 - Only number-conserving 2-qubit gates: XX+YY (hopping-like) and ZZ (interaction-like)
 - Reduces Hilbert space exploration, improves convergence for fixed particle number
+- Note: Gate-level commutation with the total number operator has not yet been formally verified
 
 ### Measurement Grouping
 

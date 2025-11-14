@@ -2,11 +2,11 @@
 
 ## Overview
 
-Complete, **verified**, and **benchmarked** implementation of variational quantum eigensolver (VQE) methods for the spinful Su-Schrieffer-Heeger (SSH) Hubbard model.
+Implementation of variational quantum eigensolver (VQE) methods for the spinful Su-Schrieffer-Heeger (SSH) Hubbard model.
 
-**Status**: ✅ Production-ready with comprehensive L=6 benchmarks
+**Status**: Verified and benchmarked for L ≤ 6 (exact validation available)
 **Branch**: `claude/dmrg-ssh-hubbard-lattice-011CV5aqeFEEksoyNARPj4Dw`
-**Latest**: All critical bugs fixed, vacuum state trap resolved, extensive benchmarks completed
+**Latest**: Critical bugs fixed, vacuum state trap resolved, L=6 benchmarks completed
 
 ---
 
@@ -16,9 +16,9 @@ Complete, **verified**, and **benchmarked** implementation of variational quantu
 - ✅ **Critical bugs fixed**: Pauli indexing, qubit layout, Jordan-Wigner coefficients
 - ✅ **Vacuum state trap** discovered and resolved (+14% accuracy improvement)
 - ✅ **Comprehensive L=6 benchmarks** across 3 parameter regimes
-- ✅ **Champion ansatz identified**: NP_HVA achieves **0.77%-17.75% errors**
+- ✅ **Best-performing ansatz on L=6**: NP_HVA achieves 0.77%-17.75% errors
 - ✅ **Hamiltonian verification**: All implementations produce identical matrices
-- ✅ **TeNPy DMRG** framework implemented (for systems beyond VQE capability)
+- ✅ **TeNPy DMRG** framework implemented (approximate; systematic offset ~1-3%)
 
 ---
 
@@ -131,16 +131,15 @@ Complete, **verified**, and **benchmarked** implementation of variational quantu
 - Best for: **Fast approximate solutions** (3-8 seconds!)
 - Notes: Extreme speed, moderate accuracy
 
-**6. NP_HVA - Number-Preserving HVA** 🏆
+**6. NP_HVA - Number-Preserving HVA**
 - Type: UNP gates (Universal Number-Preserving) + HVA structure
 - Parameters: 52 (L=6, reps=2)
-- L=6 Performance: **CHAMPION ANSATZ**
-  - Standard: **6.97% error** 🥇
-  - Weak SSH: **17.75% error** 🥇
-  - Strong SSH: **0.77% error** 🥇 (near-exact!)
-- Best for: **All regimes** - consistently best accuracy
-- Notes: Moderate cost (~170s), excellent results
-- **Highly recommended for SSH-Hubbard systems**
+- L=6 Performance: Best observed accuracy among tested ansätze
+  - Standard: 6.97% error
+  - Weak SSH: 17.75% error
+  - Strong SSH: 0.77% error
+- Best for: Observed best performance across tested regimes (L=6 only)
+- Notes: Moderate cost (~170s), designed to preserve particle number (formal verification pending)
 
 ### Tensor Network Ansätze (2) ⚠️ **FIXED**
 
@@ -183,19 +182,19 @@ Complete, **verified**, and **benchmarked** implementation of variational quantu
 
 | Rank | Ansatz | Rel. Error | Abs. Error | Params | Runtime | Energy |
 |------|--------|------------|------------|--------|---------|---------|
-| 🥇 1 | **np_hva** | **6.97%** | 2.797e-01 | 52 | 181s | -3.7310 |
-| 🥈 2 | tn_mps | 18.59% | 7.457e-01 | 312 | 476s | -3.2650 |
-| 🥉 3 | hva | 21.46% | 8.605e-01 | 32 | 66s | -3.1502 |
+| 1 | np_hva | 6.97% | 2.797e-01 | 52 | 181s | -3.7310 |
+| 2 | tn_mps | 18.59% | 7.457e-01 | 312 | 476s | -3.2650 |
+| 3 | hva | 21.46% | 8.605e-01 | 32 | 66s | -3.1502 |
 | 4 | topo_rn | 22.09% | 8.858e-01 | 72 | 210s | -3.1249 |
 | 5 | hea | 23.44% | 9.403e-01 | 72 | 93s | -3.0704 |
 | 6 | tn_mps_np | 23.68% | 9.497e-01 | 68 | 85s | -3.0611 |
 | 7 | dqap | 23.83% | 9.556e-01 | 6 | 4.4s | -3.0551 |
 | 8 | topoinsp | 32.09% | 1.287e+00 | 48 | 51s | -2.7238 |
 
-**Champions**:
-- 🏆 Most Accurate: **NP_HVA** (6.97% error)
-- ⚡ Fastest: **DQAP** (4.38s with only 6 parameters!)
-- 📊 Most Efficient: **TN_MPS** (2.390e-03 error/param)
+**Observed Performance (L=6, single-run, no statistics)**:
+- Most Accurate: NP_HVA (6.97% error)
+- Fastest: DQAP (4.38s with only 6 parameters)
+- Most Efficient (error/param): TN_MPS (2.390e-03 error/param)
 
 ---
 
@@ -204,9 +203,9 @@ Complete, **verified**, and **benchmarked** implementation of variational quantu
 
 | Rank | Ansatz | Rel. Error | Abs. Error | Params | Runtime | Energy |
 |------|--------|------------|------------|--------|---------|---------|
-| 🥇 1 | **np_hva** | **17.75%** | 8.071e-01 | 52 | 165s | -3.7400 |
-| 🥈 2 | hva | 21.92% | 9.969e-01 | 32 | 62s | -3.5501 |
-| 🥉 3 | tn_mps_np | 22.84% | 1.039e+00 | 68 | 104s | -3.5083 |
+| 1 | np_hva | 17.75% | 8.071e-01 | 52 | 165s | -3.7400 |
+| 2 | hva | 21.92% | 9.969e-01 | 32 | 62s | -3.5501 |
+| 3 | tn_mps_np | 22.84% | 1.039e+00 | 68 | 104s | -3.5083 |
 | 4 | tn_mps | 26.00% | 1.182e+00 | 312 | 470s | -3.3650 |
 | 5 | topo_rn | 27.02% | 1.229e+00 | 72 | 153s | -3.3183 |
 | 6 | dqap | 30.16% | 1.371e+00 | 6 | 3.2s | -3.1758 |
@@ -226,20 +225,20 @@ Complete, **verified**, and **benchmarked** implementation of variational quantu
 
 | Rank | Ansatz | Rel. Error | Abs. Error | Params | Runtime | Energy |
 |------|--------|------------|------------|--------|---------|---------|
-| 🥇 1 | **np_hva** | **0.77%** 🎯 | 2.881e-02 | 52 | 168s | -3.7104 |
-| 🥈 2 | hea | 19.18% | 7.173e-01 | 72 | 129s | -3.0219 |
-| 🥉 3 | hva | 19.23% | 7.192e-01 | 32 | 65s | -3.0200 |
+| 1 | np_hva | 0.77% | 2.881e-02 | 52 | 168s | -3.7104 |
+| 2 | hea | 19.18% | 7.173e-01 | 72 | 129s | -3.0219 |
+| 3 | hva | 19.23% | 7.192e-01 | 32 | 65s | -3.0200 |
 | 4 | dqap | 19.63% | 7.341e-01 | 6 | 7.8s | -3.0051 |
 | 5 | tn_mps_np | 19.71% | 7.371e-01 | 68 | 102s | -3.0021 |
 | 6 | tn_mps | 22.06% | 8.249e-01 | 312 | 459s | -2.9143 |
 | 7 | topo_rn | 29.49% | 1.103e+00 | 72 | 242s | -2.6364 |
 | 8 | topoinsp | 44.98% | 1.682e+00 | 48 | 70s | -2.0575 |
 
-**Highlights**:
-- 🎯 **NP_HVA achieves near-exact accuracy: 0.77% error!**
+**Observations**:
+- NP_HVA achieves 0.77% error in this regime
 - Strong dimerization (δ=0.67) makes the problem easier for all ansätze
 - Most efficient: NP_HVA (5.540e-04 error/param)
-- **Easiest regime** for all ansätze
+- Easiest regime among the three tested
 
 ---
 
@@ -256,7 +255,7 @@ Complete, **verified**, and **benchmarked** implementation of variational quantu
 
 | Ansatz | Standard | Weak SSH | Strong SSH | Avg Error | Speed |
 |--------|----------|----------|------------|-----------|-------|
-| **np_hva** 🏆 | 6.97% | 17.75% | **0.77%** | **8.50%** | Medium |
+| np_hva | 6.97% | 17.75% | 0.77% | 8.50% | Medium |
 | hva | 21.46% | 21.92% | 19.23% | 20.87% | Fast |
 | tn_mps | 18.59% | 26.00% | 22.06% | 22.22% | Slow |
 | hea | 23.44% | 37.92% | 19.18% | 26.85% | Medium |
@@ -267,39 +266,41 @@ Complete, **verified**, and **benchmarked** implementation of variational quantu
 
 ### Parameter Efficiency Comparison
 
-| Ansatz | Params | Avg Error | Error/Param | Speed | Recommendation |
-|--------|--------|-----------|-------------|-------|----------------|
-| **tn_mps** 📊 | 312 | 22.22% | **2.85e-03** | Slow (468s) | Best efficiency |
-| **np_hva** 🏆 | 52 | **8.50%** | 6.16e-03 | Medium (171s) | **Best overall** |
+| Ansatz | Params | Avg Error | Error/Param | Speed | Observed Use Case (L=6 only) |
+|--------|--------|-----------|-------------|-------|------------------------------|
+| tn_mps | 312 | 22.22% | 2.85e-03 | Slow (468s) | Best error/param efficiency |
+| np_hva | 52 | 8.50% | 6.16e-03 | Medium (171s) | Best accuracy observed |
 | hva | 32 | 20.87% | 6.52e-03 | Fast (64s) | Good balance |
 | tn_mps_np | 68 | 22.08% | 3.25e-02 | Medium (100s) | Number-conserving TN |
 | hea | 72 | 26.85% | 3.73e-02 | Medium (130s) | General purpose |
 | topo_rn | 72 | 26.20% | 3.64e-02 | Slow (202s) | Topological studies |
-| **dqap** ⚡ | **6** | 24.54% | 40.9e-02 | **Very Fast (5s)** | Quick estimates |
+| dqap | 6 | 24.54% | 40.9e-02 | Very Fast (5s) | Quick estimates |
 | topoinsp | 48 | 38.73% | 80.7e-02 | Fast (60s) | Needs tuning |
 
-### Use Case Recommendations
+### Observed Performance on L=6 Benchmarks
 
-**For Maximum Accuracy** → **NP_HVA** 🏆
-- Best: 0.77%-17.75% errors across all regimes
+**Note**: These are single-run results without statistical aggregation. Performance may vary for different system sizes or parameter regimes.
+
+**NP_HVA**
+- Observed accuracy: 0.77%-17.75% errors across three tested regimes (L=6)
 - Cost: 52 params, ~170s runtime
-- **Recommended for production SSH-Hubbard calculations**
+- Designed to preserve particle number (formal verification pending)
 
-**For Speed** → **DQAP** ⚡
+**DQAP**
 - Results in 3-8 seconds
 - Accuracy: ~20-30% error
 - Use for: Quick scans, initial estimates
 
-**For Parameter Efficiency** → **TN_MPS** 📊
-- Best error/parameter ratio
+**TN_MPS**
+- Best error/parameter ratio observed
 - Cost: 312 params, ~470s runtime
-- Use for: When parameters are expensive (hardware)
+- Requires initial state preparation to avoid vacuum trap
 
-**For Balanced Performance** → **HVA**
-- Good accuracy (20-22% error)
+**HVA**
+- Observed accuracy: 20-22% error (L=6)
 - Low params: 32
 - Fast: ~64s
-- Use for: General SSH-Hubbard studies
+- Physics-informed structure
 
 ---
 
@@ -437,11 +438,13 @@ return SparsePauliOp([pauli_XX_str, pauli_YY_str], coeffs=[0.5, 0.5])
 
 ## 🔍 Key Insights & Discoveries
 
-### 1. NP_HVA Dominance
-- **Consistently best** across all regimes (0.77%-17.75%)
-- Particularly exceptional in strong SSH regime (0.77% - near-exact!)
+**Validation context**: All insights based on L=6 benchmarks with exact diagonalization. Behavior at larger system sizes not yet characterized.
+
+### 1. NP_HVA Performance
+- Best observed performance across three tested regimes (0.77%-17.75% errors)
+- Particularly strong in strong SSH regime (δ=0.67): 0.77% error
 - Moderate cost (52 params, ~170s)
-- **Recommended as default ansatz for SSH-Hubbard**
+- Performance at larger L not yet characterized
 
 ### 2. Regime Difficulty Ordering
 Strong SSH (δ=0.67) < Standard (δ=0.33) < Weak SSH (δ=0.11)
@@ -458,10 +461,11 @@ Strong SSH (δ=0.67) < Standard (δ=0.33) < Weak SSH (δ=0.11)
 - **DQAP**: Fastest (3-8s) but moderate accuracy
 - **HVA**: Good balance (32 params, 64s, 21% error)
 
-### 5. Number Conservation Benefits
-- Number-preserving ansätze (np_hva, dqap, topo_rn) generally more accurate
-- Exception: HVA competes well despite not conserving number
+### 5. Number Conservation Observations
+- Ansätze designed to preserve particle number (np_hva, dqap, topo_rn) show good accuracy on L=6
+- Exception: HVA competes well despite not being strictly number-preserving
 - Strong SSH regime particularly favors number-preserving gates
+- Note: Gate-level commutation with total number operator not yet formally verified
 
 ---
 
@@ -530,10 +534,10 @@ circuit.compose(ansatz_base, inplace=True)
 ## 📈 Performance Scaling
 
 ### System Size Tested
-- **L=4**: All ansätze, multiple regimes (original benchmarks)
-- **L=6**: All 8 ansätze, 3 regimes, comprehensive benchmarks ✅
-- **L=8**: Attempted but exact diagonalization failed (Hilbert space too large)
-- **L>8**: Requires DMRG for ground truth
+- **L=4**: All ansätze, multiple regimes (original benchmarks with exact validation)
+- **L=6**: All 8 ansätze, 3 regimes, comprehensive benchmarks with exact validation ✅
+- **L=8**: Attempted but exact diagonalization not feasible (Hilbert space too large)
+- **L>8**: DMRG available but has systematic offset (~1-3%); no exact validation possible
 
 ### VQE Limitations
 - Practical limit: **L≈8** (16 qubits) due to:
@@ -544,8 +548,8 @@ circuit.compose(ansatz_base, inplace=True)
 ### Beyond VQE: DMRG
 - `ssh_hubbard_tenpy_dmrg_fixed.py` implements TeNPy DMRG
 - Can handle L=12, 16, 20+ systems
-- Provides exact benchmark for larger systems
-- Status: Framework complete, API issues being debugged
+- Provides approximate reference energies (known systematic offset ~1-3%)
+- Status: Functional but offset under investigation (likely Hamiltonian convention mismatch)
 
 ---
 
@@ -573,14 +577,16 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-## 🎓 Scientific Conclusions
+## 🎓 Observations from L=6 Benchmarks
 
-### For SSH-Hubbard VQE Studies:
-1. **Use NP_HVA** as the primary ansatz (best accuracy across all regimes)
-2. **Always use initial state preparation** for non-number-conserving ansätze
-3. **Strong SSH regime** is the easiest to optimize (use δ≥0.5 for validation)
-4. **Weak SSH regime** is most challenging (requires more parameters or iterations)
-5. **Parameter efficiency matters**: TN_MPS achieves best error/param ratio
+**Important**: These conclusions are based on L=6 systems only. Generalization to larger systems not validated.
+
+### For SSH-Hubbard VQE Studies (L ≤ 6):
+1. NP_HVA shows best observed accuracy across tested regimes
+2. Initial state preparation essential for non-number-conserving ansätze (avoids vacuum trap)
+3. Strong SSH regime (δ≥0.5) easier to optimize in tested cases
+4. Weak SSH regime (δ≈0.1) most challenging among three tested
+5. TN_MPS achieves best error/param ratio (but requires careful initialization)
 
 ### For Future Work:
 1. Implement adaptive VQE with error mitigation
@@ -591,22 +597,24 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-## ✅ Production Readiness Checklist
+## ✅ Implementation Status
 
-- [x] All ansätze implemented and tested
+- [x] All ansätze implemented and tested on L=6
 - [x] Critical bugs fixed and verified
-- [x] Comprehensive benchmarks completed (L=6)
+- [x] L=6 benchmarks completed with exact validation
 - [x] Vacuum state trap identified and resolved
 - [x] Hamiltonian consistency verified
 - [x] Documentation complete
-- [x] Champion ansatz identified (NP_HVA)
+- [x] Best-performing ansatz identified for L=6 (NP_HVA)
 - [x] Usage guidelines provided
-- [x] Performance characteristics documented
-- [ ] L=8 benchmarks (pending DMRG reference)
-- [ ] TeNPy DMRG fully operational (WIP)
+- [x] Performance characteristics documented for L=6
+- [ ] L=8 benchmarks (no exact validation available)
+- [ ] DMRG systematic offset resolved (ongoing investigation)
 - [ ] Hardware benchmarks (future work)
+- [ ] Statistical error bars from multiple runs
+- [ ] Scaling behavior characterized
 
-**Status**: ✅ **Ready for scientific use** with L≤6 systems
+**Status**: Validated for L ≤ 6. Larger systems lack exact benchmarks.
 
 ---
 
@@ -628,6 +636,6 @@ circuit.compose(ansatz_base, inplace=True)
 
 ---
 
-**Last Updated**: 2025-11-13
-**Implementation**: Complete and Production-Ready ✅
-**Champion Ansatz**: NP_HVA (0.77%-17.75% errors) 🏆
+**Last Updated**: 2025-11-14
+**Implementation**: Verified for L ≤ 6 ✅
+**Best-Performing Ansatz (L=6)**: NP_HVA (0.77%-17.75% errors across three tested regimes)

@@ -1,8 +1,8 @@
 # TeNPy DMRG Implementation Status
 
-## Current Status: ✓ Working (with small systematic offset)
+## Current Status: Approximate (Systematic Offset ~1-3% Under Investigation)
 
-The TeNPy DMRG solver for SSH-Hubbard model is **functional and usable**, though there's a small (~1-3%) systematic energy offset compared to exact diagonalization.
+The TeNPy DMRG solver for SSH-Hubbard model is functional but produces approximate results with a known systematic energy offset (~1-3%) compared to exact diagonalization. This offset does not decrease with increasing bond dimension, indicating a Hamiltonian construction issue rather than convergence limitations.
 
 ## Implementation Details
 
@@ -25,25 +25,31 @@ The TeNPy DMRG solver for SSH-Hubbard model is **functional and usable**, though
 | 4 | -2.6585      | -2.6139     | 0.045 | 1.68%      | 200   |
 | 6 | -4.0107      | -3.9059     | 0.105 | 2.61%      | 200   |
 
-**Observation**: Error does NOT decrease with increasing χ_max (tested up to 500), indicating this is **not a convergence issue** but a systematic offset in the Hamiltonian construction.
+**Critical Observation**: Error does **NOT** decrease with increasing χ_max (tested up to 500), indicating this is **not a convergence issue** but a systematic offset in the Hamiltonian construction or operator conventions.
 
 ## Known Issues
 
-### 1. Small Systematic Energy Offset (~1-3%)
+### 1. Systematic Energy Offset (~1-3%) - PRIMARY ISSUE
 
-**Symptom**: DMRG energies are consistently less negative than exact results by 1-3%, independent of χ_max.
+**Symptom**: DMRG energies are consistently less negative (higher) than exact results by 1-3%, **independent of χ_max**.
 
-**Possible Causes**:
-- Subtle issue with TeNPy unit cell interpretation
-- Jordan-Wigner string handling differences between Qiskit and TeNPy
-- Factor of 2 discrepancy in operator definitions (tested, not the issue)
-- Different fermion sign conventions
+**Key Evidence**:
+- Offset persists even when χ_max increased to 500
+- Error magnitude does NOT decrease with better convergence
+- Indicates Hamiltonian mismatch, not DMRG approximation quality
+
+**Likely Causes** (under investigation):
+- Unit cell interpretation differences between TeNPy and Qiskit frameworks
+- Jordan-Wigner string handling or parity conventions
+- Fermion sign convention mismatches
+- Hopping pattern mapping between unit cell structure and physical sites
 
 **Impact**:
-- ✓ Does NOT prevent usage for L≥8 where exact diag is impossible
-- ✓ Energy trends and relative comparisons still valid
-- ✓ Provides useful reference energies for VQE benchmarking
-- ⚠ Not suitable for ultra-high-precision applications
+- ⚠ Results are **approximate**, not exact
+- ⚠ Cannot be used as exact benchmark for VQE validation
+- ✓ May still be useful for relative energy comparisons (use with caution)
+- ✓ Can handle L≥8 systems where exact diagonalization is impossible
+- ⚠ **NOT suitable for applications requiring absolute energy accuracy**
 
 ### 2. Requires Even L
 
@@ -76,38 +82,61 @@ print(f"Bond dimension: {max(result['chi'])}")
 ✓ L=12: Runs successfully (chi reaches ~200)
 ✓ L=16+: Expected to work (not yet tested)
 
-## Reference Energies (with ~2% offset caveat)
+## DMRG Reference Values (Approximate; Known Systematic Offset)
 
-| L  | t1  | t2  | U   | χ_max | E_DMRG      | E/site      |
-|----|-----|-----|-----|-------|-------------|-------------|
-| 4  | 1.0 | 0.6 | 2.0 | 200   | -2.6139     | -0.6535     |
-| 6  | 1.0 | 0.5 | 2.0 | 100   | -3.9059     | -0.6510     |
-| 8  | 1.0 | 0.5 | 2.0 | 150   | -5.2420     | -0.6552     |
-| 12 | 1.0 | 0.5 | 2.0 | 200   | -7.9140     | -0.6595     |
+**WARNING**: These are **NOT exact** energies. Systematic offset ~1-3% observed.
 
-**Note**: These energies are systematically ~2% higher (less negative) than true ground state. Use for relative comparisons and trends, not absolute precision.
+| L  | t1  | t2  | U   | χ_max | E_DMRG (approx) | E/site | Known Exact | Rel. Error |
+|----|-----|-----|-----|-------|-----------------|--------|-------------|------------|
+| 4  | 1.0 | 0.6 | 2.0 | 200   | -2.6139         | -0.6535| -2.6585     | 1.68%      |
+| 6  | 1.0 | 0.5 | 2.0 | 100   | -3.9059         | -0.6510| -4.0107     | 2.61%      |
+| 8  | 1.0 | 0.5 | 2.0 | 150   | -5.2420         | -0.6552| N/A         | Unknown    |
+| 12 | 1.0 | 0.5 | 2.0 | 200   | -7.9140         | -0.6595| N/A         | Unknown    |
+
+**Critical Notes**:
+- L=4, L=6: Systematic offset confirmed by comparison with exact diagonalization
+- L=8, L=12: No exact reference available; actual error unknown
+- **Do NOT use these as exact benchmarks**
+- For L≥8, true ground state energy is unknown (DMRG offset not characterized)
 
 ## Recommendations
 
 ### For New Users
-- ✓ Use DMRG for L≥8 systems where exact diag is impossible
-- ✓ Focus on energy *differences* and *trends* rather than absolute values
-- ⚠ Be aware of the ~2% systematic offset
+- ⚠ **DO NOT use current DMRG results as exact benchmarks**
+- ⚠ Be aware of ~1-3% systematic energy offset (does not decrease with χ)
+- ⚠ For L≥8, no exact validation is available
+- ✓ May be useful for rough exploratory calculations (use with caution)
 
-### For Debugging the Offset
-If you want to fix the systematic error:
-1. Compare term-by-term with VQE Hamiltonian matrix elements
-2. Check Jordan-Wigner phase conventions in TeNPy
-3. Verify unit cell MPS site ordering matches expected layout
-4. Consider using single-site approach with explicit NearestNeighborModel
+### Debugging TODO List
 
-### For Production Use
-Despite the offset, the implementation is **suitable for**:
-- ✓ VQE benchmarking (relative performance)
-- ✓ Scaling studies (L dependence)
-- ✓ Parameter scans (t1, t2, U variations)
-- ✓ Entanglement studies
-- ✓ Phase diagram exploration
+**High Priority** (required to fix systematic offset):
+1. ☐ Operator-by-operator comparison with Qiskit Hamiltonian matrix elements
+2. ☐ Verify hopping pattern matches physical SSH structure
+3. ☐ Check unit cell definition and MPS site ordering
+4. ☐ Verify Jordan-Wigner parity conventions in TeNPy
+5. ☐ Test single-bond Hamiltonian terms individually
+6. ☐ Compare with alternative TeNPy model construction (NearestNeighborModel)
+7. ☐ Validate fermion anticommutation relations in unit cell basis
+
+**Until Fixed**:
+- Results should be labeled as "approximate DMRG calculation"
+- Cannot serve as exact reference for VQE validation
+- Offset magnitude at L≥8 is unknown
+
+### Current Suitability
+
+**NOT suitable for**:
+- ✗ Exact energy benchmarks for VQE validation
+- ✗ High-precision energy calculations
+- ✗ Quantitative comparison with literature values
+- ✗ Applications requiring <1% energy accuracy
+
+**May be useful for** (with appropriate caveats):
+- ⚠ Exploratory calculations for L≥8 (offset unknown)
+- ⚠ Qualitative trends (if offset is approximately constant)
+- ⚠ Entanglement structure studies (if wavefunction quality is better than energy)
+
+**Recommended approach**: Resolve systematic offset before using for scientific conclusions.
 
 ## Files
 
@@ -118,6 +147,11 @@ Despite the offset, the implementation is **suitable for**:
 
 ## Conclusion
 
-The TeNPy DMRG implementation is **working and usable** for SSH-Hubbard calculations, especially for systems beyond exact diagonalization capability (L≥8). The small systematic energy offset (~2%) does not prevent meaningful scientific use for relative comparisons and benchmarking.
+The TeNPy DMRG implementation is **functional but produces approximate results** with a persistent systematic energy offset (~1-3%). This offset does **NOT** decrease with increasing bond dimension, indicating a Hamiltonian construction or convention mismatch rather than a convergence issue.
 
-For applications requiring absolute energy precision better than 1%, further debugging of the unit cell construction would be needed.
+**Current Status**:
+- **NOT suitable as exact benchmark** for VQE or other methods
+- Offset cause under investigation (likely unit cell or Jordan-Wigner convention mismatch)
+- For L≥8 systems, no exact validation available (true error unknown)
+
+**Recommendation**: Complete debugging TODO list before using DMRG results for scientific validation or quantitative comparisons. Until fixed, all DMRG energies should be treated as exploratory approximations only.

@@ -138,7 +138,11 @@ Requirements:
 
 The `ssh_hubbard_vqe.py` script implements a Variational Quantum Eigensolver for the SSH-Hubbard model with three ansatz options inspired by topological quantum computing and Hamiltonian structure.
 
-### Three Ansatz Options
+### Ansatz Options (8 Total)
+
+**Note**: Circuit diagrams for all ansätze are available in `docs/images/` as text files. See `docs/IMPLEMENTATION_SUMMARY.md` for complete details.
+
+#### Primary Ansätze:
 
 1. **HEA (Hardware-Efficient Ansatz)**
    - Standard `EfficientSU2` circuit with Ry, Rz gates and linear entanglement

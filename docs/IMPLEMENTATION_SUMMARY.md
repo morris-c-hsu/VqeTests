@@ -86,6 +86,25 @@ Research prototype implementing variational quantum eigensolver (VQE) methods fo
 
 ## 🧬 Ansatz Library (8 Total)
 
+### Circuit Diagrams
+
+Circuit diagrams for all 8 ansätze are available in `docs/images/` as text files. Each diagram shows the quantum circuit structure for L=4 (8 qubits) with 1 repetition layer for clarity.
+
+**Available diagrams:**
+- `ansatz_hea.txt` - Hardware-Efficient Ansatz
+- `ansatz_hva.txt` - Hamiltonian-Variational Ansatz
+- `ansatz_topoinsp.txt` - Topology-Inspired Ansatz
+- `ansatz_topo_rn.txt` - RN-Topological Ansatz
+- `ansatz_dqap.txt` - DQAP Ansatz
+- `ansatz_np_hva.txt` - Number-Preserving HVA
+- `ansatz_tn_mps.txt` - Tensor Network MPS
+- `ansatz_tn_mps_np.txt` - Number-Preserving TN_MPS
+- `initial_state_half_filling.txt` - Initial state preparation
+
+**To view a circuit**: `cat docs/images/ansatz_<name>.txt`
+
+---
+
 ### Standard Ansätze (3)
 
 **1. HEA - Hardware-Efficient Ansatz**

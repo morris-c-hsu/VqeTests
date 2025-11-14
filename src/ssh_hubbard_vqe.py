@@ -1642,6 +1642,25 @@ Examples:
 
     # Exact diagonalization
     print("\n--- Exact Diagonalization ---")
+
+    # Size check for exact diagonalization
+    num_qubits = H.num_qubits
+    hilbert_dim = 2**num_qubits
+    matrix_size_gb = (hilbert_dim**2 * 16) / 1e9  # Complex128 = 16 bytes
+
+    if num_qubits > 12:  # L > 6 for SSH-Hubbard
+        raise ValueError(
+            f"⚠️ Exact diagonalization impossible for {num_qubits} qubits (L={L}).\n"
+            f"   Required matrix size: {hilbert_dim}×{hilbert_dim} (~{matrix_size_gb:.1f} GB)\n"
+            f"   L=8 requires 68 GB, which exceeds typical RAM limits.\n"
+            f"   Options: (1) Use L≤6, or (2) Use DMRG (approximate, ~1-3% systematic error)"
+        )
+    elif num_qubits > 10:  # Warning for large systems
+        warnings.warn(
+            f"Large system: {num_qubits} qubits requires ~{matrix_size_gb:.2f} GB. "
+            f"Exact diagonalization may be slow or fail due to memory constraints."
+        )
+
     H_matrix = H.to_matrix()
     print(f"Hilbert space dimension: {H_matrix.shape[0]}")
 

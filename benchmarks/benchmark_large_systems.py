@@ -50,7 +50,39 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 
 def exact_diagonalization(H: SparsePauliOp) -> Tuple[float, np.ndarray]:
-    """Compute exact ground state energy."""
+    """
+    Compute exact ground state energy via full diagonalization.
+
+    LIMITATION: Only works for L≤6 (12 qubits, 4096×4096 matrix, ~260MB).
+    For L≥8, exact diagonalization is impossible due to memory constraints.
+
+    Args:
+        H: Hamiltonian as SparsePauliOp
+
+    Returns:
+        (ground_energy, ground_state_vector)
+
+    Raises:
+        ValueError: If system is too large (>12 qubits)
+    """
+    num_qubits = H.num_qubits
+    hilbert_dim = 2**num_qubits
+    matrix_size_gb = (hilbert_dim**2 * 16) / 1e9  # Complex128 = 16 bytes
+
+    if num_qubits > 12:  # L > 6 for SSH-Hubbard
+        raise ValueError(
+            f"⚠️ Exact diagonalization impossible for {num_qubits} qubits.\n"
+            f"   Required matrix size: {hilbert_dim}×{hilbert_dim} (~{matrix_size_gb:.1f} GB)\n"
+            f"   For L=8: 16 qubits → 65,536×65,536 → 68 GB (exceeds typical RAM)\n"
+            f"   Maximum validated system: L=6 (12 qubits)\n"
+            f"   For larger systems: Use DMRG (approximate, ~1-3% systematic error)"
+        )
+    elif num_qubits > 10:
+        warnings.warn(
+            f"Large system: {num_qubits} qubits requires ~{matrix_size_gb:.2f} GB. "
+            f"May be slow or fail."
+        )
+
     H_matrix = H.to_matrix()
     eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
     return eigenvalues[0], eigenvectors[:, 0]

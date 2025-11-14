@@ -2,23 +2,30 @@
 
 ## Overview
 
-Implementation of variational quantum eigensolver (VQE) methods for the spinful Su-Schrieffer-Heeger (SSH) Hubbard model.
+Research prototype implementing variational quantum eigensolver (VQE) methods for the spinful Su-Schrieffer-Heeger (SSH) Hubbard model.
 
-**Status**: Verified and benchmarked for L ≤ 6 (exact validation available)
+**Status**: Research/educational implementation with L ≤ 6 validation
 **Branch**: `claude/dmrg-ssh-hubbard-lattice-011CV5aqeFEEksoyNARPj4Dw`
-**Latest**: Critical bugs fixed, vacuum state trap resolved, L=6 benchmarks completed
+**Current State**: L=6 benchmarks completed; known issues documented (see below)
 
 ---
 
-## 🎯 Key Achievements
+## 🎯 Implementation Status
 
-- ✅ **8 distinct ansätze** implemented and verified
-- ✅ **Critical bugs fixed**: Pauli indexing, qubit layout, Jordan-Wigner coefficients
+**Completed:**
+- ✅ **8 distinct ansätze** implemented for L≤6 systems
+- ✅ **Several bugs fixed**: Pauli indexing, qubit layout, Jordan-Wigner coefficients
 - ✅ **Vacuum state trap** discovered and resolved (+14% accuracy improvement)
-- ✅ **Comprehensive L=6 benchmarks** across 3 parameter regimes
-- ✅ **Best-performing ansatz on L=6**: NP_HVA achieves 0.77%-17.75% errors
-- ✅ **Hamiltonian verification**: All implementations produce identical matrices
-- ✅ **TeNPy DMRG** framework implemented (approximate; systematic offset ~1-3%)
+- ✅ **L=6 benchmarks** completed across 3 parameter regimes
+- ✅ **Best-performing ansatz on L=6**: NP_HVA (0.77%-17.75% errors across regimes)
+- ✅ **VQE Hamiltonian verification**: Main implementations produce consistent matrices
+
+**Known Issues (Not Fixed):**
+- ⚠️ **DMRG Hamiltonian mismatch**: 1-3% systematic energy offset (does not improve with χ)
+- ⚠️ **HVA fallback bug**: May implement wrong physics (ZZ instead of XX+YY) on older Qiskit
+- ⚠️ **Number-preserving gates**: [U,N̂]=0 property not validated via tests
+- ⚠️ **No noise modeling**: Ideal statevector simulation only
+- ⚠️ **Limited validation**: Only L≤6 verified; no literature comparison
 
 ---
 

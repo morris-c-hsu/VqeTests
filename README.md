@@ -6,20 +6,71 @@ This project implements two complementary approaches for studying the SSH-Hubbar
 2. **DMRG (Density Matrix Renormalization Group)**: Approximate classical solver for larger systems (L ≥ 8)
 3. **VQE (Variational Quantum Eigensolver)**: Quantum-inspired algorithm with topology-aware ansätze
 
-## Scope and Limitations
+## ⚠️ Limitations and Scope
 
-**Validation Status:**
-- **Exact validation available only for L ≤ 6** (12 qubits after Jordan-Wigner transformation)
-- For larger systems (L ≥ 8), DMRG provides approximate reference energies with a known systematic offset (~1–3%)
-- DMRG results should be treated as approximate, not exact benchmarks
+### What This Repository Provides:
+- Working VQE implementation for SSH-Hubbard model
+- 8 different ansatz options for small systems
+- Validated results for L≤6 sites (12 qubits)
+- Educational/research codebase for exploring VQE methods
 
-**Current Limitations:**
-- All VQE results based on statevector simulation (no noise modeling)
-- No hardware experiments
-- Single-run optimizations (no statistical error bars)
-- Number-preserving ansätze: gate-level commutation with total number operator not yet formally verified
-- Performance metrics do not necessarily generalize to larger systems
-- DMRG systematic offset under investigation (likely Hamiltonian convention mismatch)
+### Critical Limitations:
+
+**1. System Size Restrictions**
+- Only L≤6 validated against exact diagonalization
+- L=8,12 results use DMRG with known ~1-3% systematic error
+- No validation for L>12
+- Exact diagonalization impossible for L≥8 (requires >68GB RAM for L=8)
+
+**2. DMRG Issues**
+- ⚠️ **CRITICAL:** DMRG energies show 1-3% offset compared to exact diagonalization
+- This offset does NOT improve with bond dimension → indicates Hamiltonian construction mismatch
+- Root cause under investigation: likely unit cell interpretation, bond pattern ordering, or Jordan-Wigner convention differences
+- **DMRG results cannot serve as exact benchmarks**
+
+**3. Simulation Limitations**
+- Ideal statevector only (no noise models)
+- No sampling/shot noise simulation
+- No actual quantum hardware execution
+- Single optimization runs (no statistical averaging or error bars)
+- Perfect gates and measurements assumed
+
+**4. Number-Preserving Ansätze**
+- NP_HVA, TN_MPS_NP, and RN/UNP gates designed to preserve particle number
+- **[U, N̂]=0 property has not been formally verified via tests**
+- Gate-level commutation with total number operator assumed but not validated
+
+**5. Limited Parameter Exploration**
+- Mainly tested: U=2.0, δ∈{-0.333, 0, +0.333}
+- Limited boundary condition variations
+- Limited interaction strength range
+- Most benchmarks at single system size (L=6)
+
+**6. No Literature Comparisons**
+- No benchmarking against published VQE-Hubbard results
+- No comparison with ADAPT-VQE, QITE, or other advanced methods
+- Performance claims lack external validation context
+
+**7. VQE Performance Reality**
+- Observed errors: 0.77%-17.75% even on small L=6 system
+- Strong regime-dependence (some ansätze fail in certain phases)
+- Literature shows VQE accuracy typically degrades with system size
+- No evidence that these results scale favorably to larger systems
+
+### Not Production-Ready
+This is a **research/educational prototype**, not production software.
+
+**Appropriate use cases:**
+- Learning VQE and tensor network methods
+- Exploring ansatz designs for small systems
+- Educational demonstrations of quantum algorithms
+- Small-scale algorithm development and testing
+
+**Do NOT use for:**
+- Production quantum computing applications
+- Publishable benchmarks without addressing known issues
+- Quantum hardware deployment without extensive validation
+- Claims of achieving "quantum advantage"
 
 ## Physics Background
 

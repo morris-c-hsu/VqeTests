@@ -1,8 +1,36 @@
 #!/usr/bin/env python3
 """
-TeNPy DMRG Solver for SSH-Hubbard Model (Working Version)
+TeNPy DMRG Solver for SSH-Hubbard Model
 
-Properly implements spinful SSH-Hubbard model using TeNPy's CouplingMPOModel.
+⚠️ CRITICAL KNOWN ISSUE: HAMILTONIAN MISMATCH (1-3% SYSTEMATIC ERROR)
+======================================================================
+This DMRG implementation shows a systematic 1-3% energy offset compared to
+exact diagonalization. This offset does NOT decrease with increased bond
+dimension (tested up to χ=500), indicating a Hamiltonian construction issue
+rather than a convergence problem.
+
+EVIDENCE (from tests):
+- L=4: DMRG -2.6139 vs Exact -2.6585 (1.68% error)
+- L=6: DMRG -3.9059 vs Exact -4.0107 (2.61% error)
+- Error persists at χ=500 (no improvement with higher bond dimension)
+
+ROOT CAUSE (under investigation):
+1. SSH bond pattern ordering mismatch between TeNPy and VQE implementations
+2. Unit-cell interpretation differences
+3. Jordan-Wigner string or fermion sign convention errors
+4. Factor of 2 discrepancy in hopping/interaction terms
+
+CONSEQUENCE:
+All DMRG results are APPROXIMATE and cannot serve as exact benchmarks.
+Only use for exploratory calculations. Do NOT use for VQE validation.
+
+TODO (to fix):
+- Run tests/test_dmrg_hamiltonian_mismatch.py to reproduce issue
+- Compare SSH bond patterns between this and ssh_hubbard_vqe.py
+- Verify strong bonds (t1): (0,1), (2,3), (4,5), ...
+- Verify weak bonds (t2): (1,2), (3,4), (5,6), ...
+- Check TeNPy site indexing conventions
+======================================================================
 
 Hamiltonian:
     H = -∑_{i,σ} t_i (c†_{i,σ} c_{i+1,σ} + h.c.) + U ∑_i n_{i,↑} n_{i,↓}

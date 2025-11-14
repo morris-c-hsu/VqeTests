@@ -140,7 +140,7 @@ The `ssh_hubbard_vqe.py` script implements a Variational Quantum Eigensolver for
 
 ### Ansatz Options (8 Total)
 
-**Note**: Circuit diagrams for all ansätze are available in `docs/images/` as text files. See `docs/IMPLEMENTATION_SUMMARY.md` for complete details.
+**Note**: Circuit diagrams for all ansätze are available in `docs/images/` as PNG images. See `docs/IMPLEMENTATION_SUMMARY.md` for complete details and visualizations.
 
 #### Primary Ansätze:
 

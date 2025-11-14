@@ -88,20 +88,37 @@ Research prototype implementing variational quantum eigensolver (VQE) methods fo
 
 ### Circuit Diagrams
 
-Circuit diagrams for all 8 ansätze are available in `docs/images/` as text files. Each diagram shows the quantum circuit structure for L=4 (8 qubits) with 1 repetition layer for clarity.
+Circuit diagrams for all 8 ansätze are available as PNG images in `docs/images/`. Each diagram shows the quantum circuit structure for L=4 (8 qubits) with 1 repetition layer for clarity.
 
-**Available diagrams:**
-- `ansatz_hea.txt` - Hardware-Efficient Ansatz
-- `ansatz_hva.txt` - Hamiltonian-Variational Ansatz
-- `ansatz_topoinsp.txt` - Topology-Inspired Ansatz
-- `ansatz_topo_rn.txt` - RN-Topological Ansatz
-- `ansatz_dqap.txt` - DQAP Ansatz
-- `ansatz_np_hva.txt` - Number-Preserving HVA
-- `ansatz_tn_mps.txt` - Tensor Network MPS
-- `ansatz_tn_mps_np.txt` - Number-Preserving TN_MPS
-- `initial_state_half_filling.txt` - Initial state preparation
+**Initial State Preparation (Half-Filling):**
 
-**To view a circuit**: `cat docs/images/ansatz_<name>.txt`
+![Initial State: Half-Filling](images/initial_state_half_filling.png)
+
+**Ansatz Circuit Diagrams:**
+
+**1. HEA - Hardware-Efficient Ansatz**
+![HEA Circuit](images/ansatz_hea.png)
+
+**2. HVA - Hamiltonian-Variational Ansatz**
+![HVA Circuit](images/ansatz_hva.png)
+
+**3. TopoInspired - Topology-Inspired Ansatz**
+![TopoInspired Circuit](images/ansatz_topoinsp.png)
+
+**4. Topo_RN - RN-Topological Ansatz**
+![Topo_RN Circuit](images/ansatz_topo_rn.png)
+
+**5. DQAP - Discretized QAP**
+![DQAP Circuit](images/ansatz_dqap.png)
+
+**6. NP_HVA - Number-Preserving HVA**
+![NP_HVA Circuit](images/ansatz_np_hva.png)
+
+**7. TN_MPS - Tensor Network MPS**
+![TN_MPS Circuit](images/ansatz_tn_mps.png)
+
+**8. TN_MPS_NP - Number-Preserving TN_MPS**
+![TN_MPS_NP Circuit](images/ansatz_tn_mps_np.png)
 
 ---
 

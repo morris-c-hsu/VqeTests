@@ -32,34 +32,63 @@ from qiskit.circuit import QuantumCircuit
 
 
 def save_ansatz_diagram(ansatz, name, description, output_dir='../docs/images'):
-    """Save ansatz circuit diagram as PNG using matplotlib."""
+    """Save ansatz circuit diagram as PNG using matplotlib with manual gate drawing."""
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Generating diagram for {name}...")
     print(f"  Circuit: {ansatz.num_qubits} qubits, {ansatz.num_parameters} parameters, depth {ansatz.depth()}")
 
     try:
-        # Use matplotlib drawer with simplified approach
+        # Try matplotlib with latex-free approach
         from qiskit.visualization import circuit_drawer
 
-        fig = circuit_drawer(ansatz, output='mpl', style={'backgroundcolor': '#EEEEEE'}, fold=-1)
+        # Use 'mpl' output with latex=False in style
+        style = {
+            'displaytext': {},  # Don't use latex for gate labels
+            'backgroundcolor': '#FFFFFF',
+            'textcolor': '#000000',
+        }
+
+        fig = circuit_drawer(
+            ansatz,
+            output='mpl',
+            style=style,
+            plot_barriers=False,
+            fold=100  # Wider fold for better readability
+        )
+
         filename = f"{output_dir}/{name}.png"
-        plt.savefig(filename, dpi=150, bbox_inches='tight', facecolor='white')
+        plt.savefig(filename, dpi=200, bbox_inches='tight', facecolor='white', edgecolor='none')
         plt.close(fig)
         print(f"  ✓ Saved to {filename}")
+        return True
+
+    except ImportError as e:
+        if 'pylatexenc' in str(e):
+            print(f"  ⚠ pylatexenc not available, trying alternative method...")
+            # Try using latex source instead
+            try:
+                from qiskit.visualization import circuit_drawer
+                # Generate LaTeX source
+                latex_source = circuit_drawer(ansatz, output='latex_source', fold=100)
+
+                # Save LaTeX source for manual compilation
+                filename_tex = f"{output_dir}/{name}.tex"
+                with open(filename_tex, 'w') as f:
+                    f.write(latex_source)
+                print(f"  ✓ Saved LaTeX source to {filename_tex}")
+                print(f"    (requires pdflatex to compile to PDF)")
+                return False
+            except Exception as e3:
+                print(f"  ✗ LaTeX source generation failed: {e3}")
+                return False
+        else:
+            print(f"  ✗ Import error: {e}")
+            return False
 
     except Exception as e:
         print(f"  ✗ Error with matplotlib: {e}")
-        print(f"  Trying text mode fallback...")
-        try:
-            # Fallback to text mode
-            text_output = circuit_drawer(ansatz, output='text', fold=80)
-            filename_txt = f"{output_dir}/{name}.txt"
-            with open(filename_txt, 'w') as f:
-                f.write(str(text_output))  # Convert TextDrawing to string
-            print(f"  ✓ Saved text version to {filename_txt}")
-        except Exception as e2:
-            print(f"  ✗ Text fallback also failed: {e2}")
+        return False
 
 
 def main():

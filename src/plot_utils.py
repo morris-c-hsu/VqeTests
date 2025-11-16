@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import os
 from typing import List, Optional
 
@@ -68,7 +69,7 @@ def plot_vqe_convergence(
     # Prepare data
     it = np.arange(1, len(energy_history) + 1)
     Ek = np.array(energy_history)
-    abs_err_hist = np.abs(Ek - exact_energy)
+    rel_err_hist = 100 * np.abs(Ek - exact_energy) / abs(exact_energy)
 
     # Generate filename prefix
     if prefix:
@@ -93,11 +94,18 @@ def plot_vqe_convergence(
 
     # Plot 2: Error convergence (log scale)
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.semilogy(it, abs_err_hist, 'b-', linewidth=2)
+    ax.semilogy(it, rel_err_hist, 'b-', linewidth=2)
     ax.set_xlabel('Evaluation', fontsize=12)
-    ax.set_ylabel('|E_VQE - E_exact|', fontsize=12)
-    ax.set_title(f'VQE Error (log scale) - L={L}, {ansatz_name.upper()}', fontsize=13)
-    ax.grid(True, alpha=0.3)
+    ax.set_ylabel('Relative Error (%)', fontsize=12)
+    ax.set_title(f'VQE Relative Error (log scale) - L={L}, {ansatz_name.upper()}', fontsize=13)
+
+    # Better log-scale formatting
+    ax.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=15))
+    ax.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=100))
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:.0f}' if x >= 1 else f'{x:.1f}'))
+
+    ax.grid(True, alpha=0.3, which='major')
+    ax.grid(True, alpha=0.15, which='minor')
     plt.tight_layout()
 
     error_path = os.path.join(output_dir, f'{file_prefix}_error_log.png')
@@ -106,14 +114,14 @@ def plot_vqe_convergence(
 
     # Print statistics
     if show_stats:
-        initial_err = abs_err_hist[0]
-        final_err = abs_err_hist[-1]
+        initial_err = rel_err_hist[0]
+        final_err = rel_err_hist[-1]
         reduction = initial_err / final_err if final_err > 1e-15 else np.inf
 
         print(f"  ✓ Convergence plots saved:")
         print(f"      Energy: {os.path.basename(energy_path)}")
         print(f"      Error:  {os.path.basename(error_path)}")
-        print(f"  Convergence: {initial_err:.3e} → {final_err:.3e} ({reduction:.1f}x reduction)")
+        print(f"  Convergence: {initial_err:.2f}% → {final_err:.2f}% ({reduction:.1f}x reduction)")
 
     return energy_path, error_path
 
@@ -164,14 +172,14 @@ def plot_multi_ansatz_comparison(
 
         it = np.arange(1, len(energy_history) + 1)
         Ek = np.array(energy_history)
-        abs_err = np.abs(Ek - exact_energy)
+        rel_err = 100 * np.abs(Ek - exact_energy) / abs(exact_energy)
 
         # Energy plot
         ax1.plot(it, Ek, '-', linewidth=2, label=ansatz_name.upper(),
                  color=colors[idx])
 
         # Error plot
-        ax2.semilogy(it, abs_err, '-', linewidth=2, label=ansatz_name.upper(),
+        ax2.semilogy(it, rel_err, '-', linewidth=2, label=ansatz_name.upper(),
                      color=colors[idx])
 
     # Exact energy reference
@@ -187,10 +195,17 @@ def plot_multi_ansatz_comparison(
 
     # Configure error plot
     ax2.set_xlabel('Evaluation', fontsize=12)
-    ax2.set_ylabel('|E_VQE - E_exact|', fontsize=12)
-    ax2.set_title(f'Error Convergence (log scale, L={L})', fontsize=13)
+    ax2.set_ylabel('Relative Error (%)', fontsize=12)
+    ax2.set_title(f'Relative Error Convergence (log scale, L={L})', fontsize=13)
+
+    # Better log-scale formatting
+    ax2.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=15))
+    ax2.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=100))
+    ax2.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:.0f}' if x >= 1 else f'{x:.1f}'))
+
     ax2.legend(fontsize=9)
-    ax2.grid(True, alpha=0.3)
+    ax2.grid(True, alpha=0.3, which='major')
+    ax2.grid(True, alpha=0.15, which='minor')
 
     plt.tight_layout()
 
@@ -199,5 +214,151 @@ def plot_multi_ansatz_comparison(
     plt.close()
 
     print(f"✓ Multi-ansatz comparison saved: {os.path.basename(output_path)}")
+
+    return output_path
+
+
+def plot_multistart_convergence(
+    per_seed_results: List[dict],
+    exact_energy: float,
+    ansatz_name: str,
+    optimizer_name: str,
+    L: int,
+    output_dir: str = '../docs/images',
+    show_stats: bool = True
+) -> str:
+    """
+    Plot convergence curves for multi-start VQE runs.
+
+    Shows all seed runs with different transparency, highlights best seed,
+    and displays mean ± std bands.
+
+    Parameters
+    ----------
+    per_seed_results : List[dict]
+        List of individual VQE run results, each with 'energy_history' and 'seed'
+    exact_energy : float
+        Exact ground state energy
+    ansatz_name : str
+        Name of ansatz (for plot titles and filenames)
+    optimizer_name : str
+        Name of optimizer (L_BFGS_B, COBYLA, SLSQP)
+    L : int
+        Number of lattice sites
+    output_dir : str, optional
+        Directory to save plots (default: '../docs/images')
+    show_stats : bool, optional
+        Print convergence statistics (default: True)
+
+    Returns
+    -------
+    output_path : str
+        Path to saved plot file
+
+    Examples
+    --------
+    >>> results = [{'energy_history': [...], 'seed': 0, 'energy': -4.82}, ...]
+    >>> plot_multistart_convergence(results, -4.823, 'hea', 'L_BFGS_B', 4)
+    '../docs/images/convergence_hea_L_BFGS_B_L4.png'
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Find best seed (lowest final energy)
+    energies = [r['energy'] for r in per_seed_results]
+    best_idx = int(np.argmin(energies))
+
+    # Track max iteration count for alignment
+    max_iters = max(len(r['energy_history']) for r in per_seed_results)
+
+    # Prepare data for mean/std calculation
+    # Pad shorter histories with their final value
+    all_histories = []
+    for result in per_seed_results:
+        hist = result['energy_history']
+        if len(hist) < max_iters:
+            # Pad with final value
+            padded = hist + [hist[-1]] * (max_iters - len(hist))
+        else:
+            padded = hist
+        all_histories.append(padded)
+
+    all_histories = np.array(all_histories)
+    mean_energy = np.mean(all_histories, axis=0)
+    std_energy = np.std(all_histories, axis=0)
+
+    # Plot individual seeds
+    for idx, result in enumerate(per_seed_results):
+        history = result['energy_history']
+        seed = result['seed']
+        it = np.arange(1, len(history) + 1)
+
+        if idx == best_idx:
+            # Highlight best seed
+            ax1.plot(it, history, '-', linewidth=2, alpha=0.9,
+                    color='blue', label=f'Seed {seed} (best)')
+
+            rel_err = 100 * np.abs(np.array(history) - exact_energy) / abs(exact_energy)
+            ax2.semilogy(it, rel_err, '-', linewidth=2, alpha=0.9,
+                        color='blue', label=f'Seed {seed} (best)')
+        else:
+            # Other seeds with transparency
+            ax1.plot(it, history, '-', linewidth=1, alpha=0.3,
+                    color='gray', label=f'Seed {seed}' if idx == 0 else '')
+
+            rel_err = 100 * np.abs(np.array(history) - exact_energy) / abs(exact_energy)
+            ax2.semilogy(it, rel_err, '-', linewidth=1, alpha=0.3,
+                        color='gray', label=f'Other seeds' if idx == 0 else '')
+
+    # Plot mean ± std band
+    it_full = np.arange(1, max_iters + 1)
+    ax1.plot(it_full, mean_energy, 'r--', linewidth=2, alpha=0.7, label='Mean')
+    ax1.fill_between(it_full, mean_energy - std_energy, mean_energy + std_energy,
+                     alpha=0.2, color='red', label='±1 std')
+
+    # Exact energy reference
+    ax1.axhline(exact_energy, color='green', linestyle='--', linewidth=1.5,
+               label='Exact', alpha=0.7)
+
+    # Configure energy plot
+    ax1.set_xlabel('Evaluation', fontsize=12)
+    ax1.set_ylabel('Energy', fontsize=12)
+    ax1.set_title(f'Multi-Start Convergence: {ansatz_name.upper()} ({optimizer_name})\nL={L}',
+                 fontsize=13)
+    ax1.legend(fontsize=9)
+    ax1.grid(True, alpha=0.3)
+
+    # Configure error plot
+    ax2.set_xlabel('Evaluation', fontsize=12)
+    ax2.set_ylabel('Relative Error (%)', fontsize=12)
+    ax2.set_title(f'Relative Error Convergence (log scale)\n{ansatz_name.upper()} ({optimizer_name}), L={L}',
+                 fontsize=13)
+
+    # Better log-scale formatting
+    ax2.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=15))
+    ax2.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=100))
+    ax2.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:.0f}' if x >= 1 else f'{x:.1f}'))
+
+    ax2.legend(fontsize=9)
+    ax2.grid(True, alpha=0.3, which='major')
+    ax2.grid(True, alpha=0.15, which='minor')
+
+    plt.tight_layout()
+
+    # Save plot
+    filename = f'convergence_{ansatz_name}_{optimizer_name}_L{L}.png'
+    output_path = os.path.join(output_dir, filename)
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+    if show_stats:
+        best_energy = energies[best_idx]
+        mean_final = mean_energy[-1]
+        std_final = std_energy[-1]
+
+        print(f"  ✓ Multi-start convergence plot saved: {filename}")
+        print(f"    Best energy:  {best_energy:.10f} (seed {per_seed_results[best_idx]['seed']})")
+        print(f"    Mean ± std:   {mean_final:.10f} ± {std_final:.3e}")
 
     return output_path

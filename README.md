@@ -63,18 +63,28 @@ The VQE implementation:
 
 - uses ideal statevector simulation (no hardware noise, no sampling noise),
 - constructs the JW Hamiltonian as Qiskit SparsePauliOps,
-- optimizes circuit parameters using L-BFGS-B,
+- supports multiple optimizers: L-BFGS-B, COBYLA, SLSQP,
 - compares energies to ED for L ≤ 6.
 
-**Important methodological limitation:**
-Only **a single optimization run** is performed per ansatz and parameter set (no multi-start or ensemble averaging).
-Because VQE loss landscapes are highly non-convex, this means that:
+**Multi-Start VQE Infrastructure:**
+The repository now includes **multi-start VQE** capabilities to address the non-convex optimization landscape:
 
-- the reported energies reflect a *single* local minimum,
-- the results cannot be interpreted as representative of an ansatz's general performance,
-- comparisons between ansätze are not statistically meaningful.
+- 3 optimizers: L-BFGS-B (default), COBYLA, SLSQP
+- Multiple random seeds per optimizer for statistical analysis
+- Aggregate statistics: mean, std, min, max across all runs
+- Convergence visualization with relative error percentage plots
+- Automatic COBYLA iteration adjustment (10× base maxiter, minimum 1000) for fair comparison
 
-Thus, all VQE results in the repository should be read as examples of *particular optimization trajectories*, not as evidence of relative ansatz quality.
+**Usage modes**:
+- **Single-run mode** (original): Quick tests and debugging (`use_multistart=False`)
+- **Multi-start mode** (recommended): Robust benchmarking with statistical significance (`use_multistart=True`)
+
+For comprehensive multi-start benchmarking, use:
+```bash
+python benchmarks/run_multistart_benchmark.py --L 4
+```
+
+See [`docs/MULTISTART_VQE_GUIDE.md`](docs/MULTISTART_VQE_GUIDE.md) and [`benchmarks/README.md`](benchmarks/README.md) for details.
 
 ### 3.3 Tensor-Network–Inspired VQE
 
@@ -144,18 +154,29 @@ The repository does not contain sufficient statistical or methodological support
 
 ---
 
-## 5. Benchmarking Status (L ≤ 6 Only)
+## 5. Benchmarking Status
 
-The repository includes scripts to run VQE on L = 6 for selected values of \(U\) and \(\delta\).
+The repository includes comprehensive multi-start VQE benchmarking infrastructure:
+
+**Multi-Start Benchmarking** (Recommended):
+- 3 optimizers: L-BFGS-B, COBYLA, SLSQP
+- Multiple random initializations (5 seeds per optimizer by default)
+- Ensemble-based statistics: mean, std, min, max across runs
+- Convergence visualization with relative error percentage plots
+- Statistical significance testing across ansätze
+- See [`docs/test_results_L4.md`](docs/test_results_L4.md) for comprehensive results
+
+**Single-Run Mode** (Legacy):
+The original single-initialization VQE scripts remain available for quick testing.
 However:
-
-- only single initializations were used,
+- only single initializations are used,
 - the energy landscape is non-convex,
 - results vary significantly across local minima,
-- no ensemble-based statistics are provided,
-- therefore **the numerical results cannot be considered benchmarks**.
+- therefore **single-run results cannot be considered benchmarks**.
 
-They should be interpreted strictly as examples of running VQE with these circuits.
+For statistically meaningful comparisons, use the multi-start benchmarking tools in [`benchmarks/`](benchmarks/).
+
+**Tested System Sizes**: L = 4, 6 (multi-start); L = 8 (sparse Lanczos, single-run)
 
 ---
 
@@ -163,15 +184,18 @@ They should be interpreted strictly as examples of running VQE with these circui
 
 ```
 src/
-  ssh_hubbard_vqe.py                 # Main VQE + 6 ansätze
-  ssh_hubbard_tn_vqe.py              # TN-based ansätze (MPS-like circuits)
-  ssh_hubbard_tenpy_dmrg_fixed.py   # TeNPy DMRG (has systematic error)
-  plot_utils.py                      # Convergence plotting utilities
+  ssh_hubbard_vqe.py                 # Main VQE + 3 main ansätze
+  plot_utils.py                      # Convergence plotting with relative error %
+  ansatze/
+    archived_ansatze.py              # 5 archived ansätze
 
 benchmarks/
-  compare_all_ansatze.py             # Systematic ansatz comparison
-  benchmark_large_systems.py         # L=6,7,8 system tests
-  run_longer_optimizations.py       # Extended optimization runs
+  run_multistart_benchmark.py        # ⭐ Multi-start VQE with 3 optimizers
+  compare_all_ansatze.py             # Core comparison infrastructure
+  quick_benchmark.py                 # Fast single-run testing
+  benchmark_large_systems.py         # L=6,8 system tests (sparse Lanczos)
+  run_longer_optimizations.py        # Extended optimization runs
+  README.md                          # Benchmark suite documentation
 
 tests/
   test_sparse_lanczos.py             # Sparse Lanczos validation
@@ -183,9 +207,14 @@ tests/
     README.md                        # DMRG test documentation
 
 docs/
-  IMPLEMENTATION_SUMMARY.md          # Implementation details
+  MULTISTART_VQE_GUIDE.md            # ⭐ Multi-start VQE guide
+  IMPLEMENTATION_SUMMARY.md          # Implementation details & recent updates
+  test_results_L4.md                 # L=4 multi-start benchmark results
+  ANSATZ_OVERVIEW.md                 # Ansatz documentation
   DMRG_STATUS.md                     # DMRG error status
   SPARSE_LANCZOS.md                  # Sparse diagonalization docs
+  images/                            # Convergence plots
+    convergence_*_L*.png             # Multi-start convergence plots
 ```
 
 ---

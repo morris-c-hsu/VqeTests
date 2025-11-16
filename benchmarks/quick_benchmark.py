@@ -17,13 +17,9 @@ from ssh_hubbard_vqe import (
     ssh_hubbard_hamiltonian,
     build_ansatz_hea,
     build_ansatz_hva_sshh,
-    build_ansatz_topo_sshh,
-    build_ansatz_topo_rn_sshh,
-    build_ansatz_dqap_sshh,
     build_ansatz_np_hva_sshh,
-    build_ansatz_tn_mps_sshh,
-    build_ansatz_tn_mps_np_sshh
 )
+# Additional ansätze available in ansatze/archived_ansatze.py
 
 from qiskit_algorithms.optimizers import L_BFGS_B
 from qiskit_algorithms import VQE
@@ -60,20 +56,16 @@ E_exact = eigsh(H_sparse, k=1, which='SA', return_eigenvectors=False)[0]
 
 print(f"\nExact ground energy: {E_exact:.8f}")
 
-# Ansätze to test
+# Main ansätze (focused on 3 core ansätze)
+# Additional ansätze available in src/ansatze/archived_ansatze.py
 ansatze = {
     'HEA': lambda: build_ansatz_hea(N, reps),
     'HVA': lambda: build_ansatz_hva_sshh(L, reps, t1, t2, include_U=True),
-    'TopoInspired': lambda: build_ansatz_topo_sshh(L, reps, use_edge_link=True),
-    'TopoRN': lambda: build_ansatz_topo_rn_sshh(L, reps, use_edge_link=True),
-    'DQAP': lambda: build_ansatz_dqap_sshh(L, reps, include_U=True),
     'NP_HVA': lambda: build_ansatz_np_hva_sshh(L, reps),
-    'TN_MPS': lambda: build_ansatz_tn_mps_sshh(L, reps),
-    'TN_MPS_NP': lambda: build_ansatz_tn_mps_np_sshh(L, reps),
 }
 
 # Number-conserving ansätze need half-filling initialization
-number_conserving = {'HVA', 'DQAP', 'NP_HVA', 'TN_MPS_NP'}
+number_conserving = {'HVA', 'NP_HVA'}
 
 results = []
 

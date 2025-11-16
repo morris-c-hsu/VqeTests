@@ -68,7 +68,7 @@ def plot_vqe_convergence(
     # Prepare data
     it = np.arange(1, len(energy_history) + 1)
     Ek = np.array(energy_history)
-    abs_err_hist = np.abs(Ek - exact_energy)
+    rel_err_hist = 100 * np.abs(Ek - exact_energy) / abs(exact_energy)
 
     # Generate filename prefix
     if prefix:
@@ -93,10 +93,10 @@ def plot_vqe_convergence(
 
     # Plot 2: Error convergence (log scale)
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.semilogy(it, abs_err_hist, 'b-', linewidth=2)
+    ax.semilogy(it, rel_err_hist, 'b-', linewidth=2)
     ax.set_xlabel('Evaluation', fontsize=12)
-    ax.set_ylabel('|E_VQE - E_exact|', fontsize=12)
-    ax.set_title(f'VQE Error (log scale) - L={L}, {ansatz_name.upper()}', fontsize=13)
+    ax.set_ylabel('Relative Error (%)', fontsize=12)
+    ax.set_title(f'VQE Relative Error (log scale) - L={L}, {ansatz_name.upper()}', fontsize=13)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
@@ -106,14 +106,14 @@ def plot_vqe_convergence(
 
     # Print statistics
     if show_stats:
-        initial_err = abs_err_hist[0]
-        final_err = abs_err_hist[-1]
+        initial_err = rel_err_hist[0]
+        final_err = rel_err_hist[-1]
         reduction = initial_err / final_err if final_err > 1e-15 else np.inf
 
         print(f"  ✓ Convergence plots saved:")
         print(f"      Energy: {os.path.basename(energy_path)}")
         print(f"      Error:  {os.path.basename(error_path)}")
-        print(f"  Convergence: {initial_err:.3e} → {final_err:.3e} ({reduction:.1f}x reduction)")
+        print(f"  Convergence: {initial_err:.2f}% → {final_err:.2f}% ({reduction:.1f}x reduction)")
 
     return energy_path, error_path
 
@@ -164,14 +164,14 @@ def plot_multi_ansatz_comparison(
 
         it = np.arange(1, len(energy_history) + 1)
         Ek = np.array(energy_history)
-        abs_err = np.abs(Ek - exact_energy)
+        rel_err = 100 * np.abs(Ek - exact_energy) / abs(exact_energy)
 
         # Energy plot
         ax1.plot(it, Ek, '-', linewidth=2, label=ansatz_name.upper(),
                  color=colors[idx])
 
         # Error plot
-        ax2.semilogy(it, abs_err, '-', linewidth=2, label=ansatz_name.upper(),
+        ax2.semilogy(it, rel_err, '-', linewidth=2, label=ansatz_name.upper(),
                      color=colors[idx])
 
     # Exact energy reference
@@ -187,8 +187,8 @@ def plot_multi_ansatz_comparison(
 
     # Configure error plot
     ax2.set_xlabel('Evaluation', fontsize=12)
-    ax2.set_ylabel('|E_VQE - E_exact|', fontsize=12)
-    ax2.set_title(f'Error Convergence (log scale, L={L})', fontsize=13)
+    ax2.set_ylabel('Relative Error (%)', fontsize=12)
+    ax2.set_title(f'Relative Error Convergence (log scale, L={L})', fontsize=13)
     ax2.legend(fontsize=9)
     ax2.grid(True, alpha=0.3)
 
@@ -284,16 +284,16 @@ def plot_multistart_convergence(
             ax1.plot(it, history, '-', linewidth=2, alpha=0.9,
                     color='blue', label=f'Seed {seed} (best)')
 
-            abs_err = np.abs(np.array(history) - exact_energy)
-            ax2.semilogy(it, abs_err, '-', linewidth=2, alpha=0.9,
+            rel_err = 100 * np.abs(np.array(history) - exact_energy) / abs(exact_energy)
+            ax2.semilogy(it, rel_err, '-', linewidth=2, alpha=0.9,
                         color='blue', label=f'Seed {seed} (best)')
         else:
             # Other seeds with transparency
             ax1.plot(it, history, '-', linewidth=1, alpha=0.3,
                     color='gray', label=f'Seed {seed}' if idx == 0 else '')
 
-            abs_err = np.abs(np.array(history) - exact_energy)
-            ax2.semilogy(it, abs_err, '-', linewidth=1, alpha=0.3,
+            rel_err = 100 * np.abs(np.array(history) - exact_energy) / abs(exact_energy)
+            ax2.semilogy(it, rel_err, '-', linewidth=1, alpha=0.3,
                         color='gray', label=f'Other seeds' if idx == 0 else '')
 
     # Plot mean ± std band
@@ -316,8 +316,8 @@ def plot_multistart_convergence(
 
     # Configure error plot
     ax2.set_xlabel('Evaluation', fontsize=12)
-    ax2.set_ylabel('|E_VQE - E_exact|', fontsize=12)
-    ax2.set_title(f'Error Convergence (log scale)\n{ansatz_name.upper()} ({optimizer_name}), L={L}',
+    ax2.set_ylabel('Relative Error (%)', fontsize=12)
+    ax2.set_title(f'Relative Error Convergence (log scale)\n{ansatz_name.upper()} ({optimizer_name}), L={L}',
                  fontsize=13)
     ax2.legend(fontsize=9)
     ax2.grid(True, alpha=0.3)

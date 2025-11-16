@@ -35,7 +35,8 @@ except ImportError:
 
 # Import from our implementations
 import sys
-sys.path.insert(0, '/home/user/morriis_project')
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ssh_hubbard_vqe import (
     ssh_hubbard_hamiltonian,
@@ -48,6 +49,8 @@ from ssh_hubbard_vqe import (
     prepare_half_filling_state,
 )
 
+from plot_utils import plot_vqe_convergence, plot_multi_ansatz_comparison
+
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 
@@ -58,6 +61,9 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 def exact_diagonalization(H: SparsePauliOp) -> Tuple[float, np.ndarray]:
     """
     Compute exact ground state energy and state via full diagonalization.
+
+    Uses dense diagonalization for L <= 6 (Hilbert space <= 4096)
+    and sparse Lanczos method for L > 6.
 
     Parameters
     ----------
@@ -71,10 +77,22 @@ def exact_diagonalization(H: SparsePauliOp) -> Tuple[float, np.ndarray]:
     psi0 : np.ndarray
         Ground state vector
     """
-    H_matrix = H.to_matrix()
-    eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
-    E0 = eigenvalues[0]
-    psi0 = eigenvectors[:, 0]
+    dim = 2 ** H.num_qubits
+
+    # Use sparse methods for large systems (L > 6 means dim > 4096)
+    if dim > 4096:
+        from scipy.sparse.linalg import eigsh
+        H_sparse = H.to_matrix(sparse=True)
+        eigenvalues, eigenvectors = eigsh(H_sparse, k=1, which='SA')
+        E0 = eigenvalues[0]
+        psi0 = eigenvectors[:, 0]
+    else:
+        # Dense diagonalization for small systems
+        H_matrix = H.to_matrix()
+        eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
+        E0 = eigenvalues[0]
+        psi0 = eigenvectors[:, 0]
+
     return E0, psi0
 
 
@@ -280,7 +298,8 @@ def compare_ansatze(L: int, t1: float, t2: float, U: float,
                 'depth': ansatz.depth(),
                 'evaluations': vqe_result['evaluations'],
                 'runtime': vqe_result['runtime'],
-                'convergence': len(vqe_result['energy_history'])
+                'convergence': len(vqe_result['energy_history']),
+                'energy_history': vqe_result['energy_history']
             }
 
             if verbose:
@@ -290,10 +309,45 @@ def compare_ansatze(L: int, t1: float, t2: float, U: float,
                 print(f"  Evaluations:      {vqe_result['evaluations']}")
                 print(f"  Runtime:          {vqe_result['runtime']:.2f}s")
 
+            # Generate convergence plots
+            if len(vqe_result['energy_history']) > 0:
+                try:
+                    plot_vqe_convergence(
+                        energy_history=vqe_result['energy_history'],
+                        exact_energy=E_exact,
+                        ansatz_name=ansatz_name,
+                        L=L,
+                        output_dir='../results',
+                        prefix=f'compare_delta{delta:.2f}_U{U:.1f}',
+                        show_stats=verbose
+                    )
+                except Exception as e:
+                    if verbose:
+                        print(f"  Warning: Could not generate convergence plots: {e}")
+
         except Exception as e:
             if verbose:
                 print(f"  ERROR: {str(e)}")
             results['ansatze'][ansatz_name] = {'error': str(e)}
+
+    # Generate multi-ansatz comparison plot
+    if verbose:
+        try:
+            histories = {name: res['energy_history']
+                        for name, res in results['ansatze'].items()
+                        if 'energy_history' in res and len(res['energy_history']) > 0}
+
+            if len(histories) > 1:
+                print(f"\n[Comparison] Generating multi-ansatz comparison plot...")
+                plot_multi_ansatz_comparison(
+                    results_dict=histories,
+                    L=L,
+                    exact_energy=E_exact,
+                    output_dir='../results',
+                    filename=f'compare_L{L}_delta{delta:.2f}_U{U:.1f}_all_ansatze.png'
+                )
+        except Exception as e:
+            print(f"  Warning: Could not generate comparison plot: {e}")
 
     return results
 

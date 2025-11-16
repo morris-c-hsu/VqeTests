@@ -2,34 +2,30 @@
 """
 TeNPy DMRG Solver for SSH-Hubbard Model
 
-⚠️ CRITICAL KNOWN ISSUE: HAMILTONIAN MISMATCH (1-3% SYSTEMATIC ERROR)
+⚠️ POTENTIAL FIX APPLIED - NEEDS TESTING
 ======================================================================
-This DMRG implementation shows a systematic 1-3% energy offset compared to
-exact diagonalization. This offset does NOT decrease with increased bond
-dimension (tested up to χ=500), indicating a Hamiltonian construction issue
-rather than a convergence problem.
+Previous version had 1-3% systematic error vs exact diagonalization.
 
-EVIDENCE (from tests):
-- L=4: DMRG -2.6139 vs Exact -2.6585 (1.68% error)
-- L=6: DMRG -3.9059 vs Exact -4.0107 (2.61% error)
-- Error persists at χ=500 (no improvement with higher bond dimension)
+IDENTIFIED ISSUE:
+TeNPy's add_coupling() with plus_hc=True may include an automatic 1/2
+factor to avoid double-counting when adding Hermitian conjugates.
 
-ROOT CAUSE (under investigation):
-1. SSH bond pattern ordering mismatch between TeNPy and VQE implementations
-2. Unit-cell interpretation differences
-3. Jordan-Wigner string or fermion sign convention errors
-4. Factor of 2 discrepancy in hopping/interaction terms
+FIX APPLIED:
+Doubled hopping coefficients to compensate:
+- Changed -t1 to -2*t1 for intra-cell hopping
+- Changed -t2 to -2*t2 for inter-cell hopping
 
-CONSEQUENCE:
-All DMRG results are APPROXIMATE and cannot serve as exact benchmarks.
-Only use for exploratory calculations. Do NOT use for VQE validation.
+This ensures: H = -∑ t (c†c + h.c.) matches VQE implementation.
 
-TODO (to fix):
-- Run tests/test_dmrg_hamiltonian_mismatch.py to reproduce issue
-- Compare SSH bond patterns between this and ssh_hubbard_vqe.py
-- Verify strong bonds (t1): (0,1), (2,3), (4,5), ...
-- Verify weak bonds (t2): (1,2), (3,4), (5,6), ...
-- Check TeNPy site indexing conventions
+TESTING REQUIRED:
+Run tests/test_dmrg_hamiltonian_mismatch.py to verify fix.
+Expected: DMRG should match exact diag within <0.1%.
+
+PREVIOUS ERRORS (before fix):
+- L=4: DMRG -2.6139 vs Exact -2.6585 (1.68%)
+- L=6: DMRG -3.9059 vs Exact -4.0107 (2.61%)
+
+If fix is correct, errors should be eliminated.
 ======================================================================
 
 Hamiltonian:

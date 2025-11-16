@@ -1,8 +1,61 @@
 # TeNPy DMRG Implementation Status
 
-## Current Status: Approximate (Systematic Offset ~1-3% Under Investigation)
+## Current Status: ROOT CAUSE UNDER INVESTIGATION
 
-The TeNPy DMRG solver for SSH-Hubbard model is functional but produces approximate results with a known systematic energy offset (~1-3%) compared to exact diagonalization. This offset does not decrease with increasing bond dimension, indicating a Hamiltonian construction issue rather than convergence limitations.
+**Update**: Extensive debugging has narrowed down the issue significantly, but the root cause in TeNPy has not been identified. A previous fix attempt (doubling hopping coefficients) was tested and **failed** - it made the error worse (1.68% → 147%). The error is **conditional** and only appears under specific circumstances.
+
+## Critical Discovery: Error is Conditional
+
+The error **does NOT always appear**. It depends on system size and hopping parameter ratios:
+
+**Works perfectly** (error < 0.01%):
+- ✓ L=2 with any parameters
+- ✓ L=4 with t2=0 (isolated dimers)
+- ✓ L=4 with t1=0 (inter-cell hopping only)
+- ✓ L=4 with t2/t1 < 0.5 (weak dimerization)
+
+**Has systematic error** (1-6%):
+- ✗ L=4 with t2/t1 ≥ 0.5 (moderate to strong dimerization)
+- ✗ Error increases as t2 approaches or exceeds t1
+
+**Key finding**: Error threshold is **exactly** at t2 = t1/2, not approximately.
+
+## Error Characteristics
+
+1. **Threshold behavior**: Sharp onset at t2/t1 = 0.5
+   - t2/t1 = 0.49: Perfect (0.00% error)
+   - t2/t1 = 0.50: Tiny error (0.01%)
+   - t2/t1 = 0.51: Significant error (0.19%)
+   - t2/t1 = 0.60: Large error (1.68%)
+
+2. **Not a convergence issue**: Error is identical for χ=10 to χ=1000
+   - Actual bond dimension used: only χ≈16
+   - Error magnitude constant regardless of χ_max
+   - → This is a Hamiltonian construction bug, not DMRG approximation
+
+3. **Interference between coupling types**: Each type works perfectly alone
+   - Intra-cell only (t1≠0, t2=0): Perfect
+   - Inter-cell only (t1=0, t2≠0): Perfect
+   - Both together with t2≥t1/2: Error appears
+
+## What Was Tested
+
+**Failed fix attempts**:
+- ✗ Doubling hopping coefficients (made error worse: 147%)
+- ✗ Changing lattice position parameters (no effect)
+- ✗ Manual hermitian conjugate addition (implementation failed)
+
+**Verification tests**:
+- ✓ VQE Hamiltonian verified correct by manual construction
+- ✓ Bond pattern verified correct (SSH structure preserved)
+- ✓ Unit cell mapping verified
+- ✓ Jordan-Wigner fermion signs verified
+
+See `tests/DMRG_DEBUG_REPORT.md` for complete debugging details.
+
+## Previous Systematic Offset (~1-3%)
+
+Before the fix, DMRG produced approximate results with systematic energy offset compared to exact diagonalization. This offset did not decrease with increasing bond dimension, indicating a Hamiltonian construction issue rather than convergence limitations.
 
 ## Implementation Details
 

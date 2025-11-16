@@ -28,7 +28,8 @@ except ImportError:
 
 # Import from our implementations
 import sys
-sys.path.insert(0, '/home/user/morriis_project')
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ssh_hubbard_vqe import (
     ssh_hubbard_hamiltonian,
@@ -46,57 +47,67 @@ from ssh_hubbard_tn_vqe import (
     build_ansatz_tn_mps_np_sshh,
 )
 
+from plot_utils import plot_vqe_convergence, plot_multi_ansatz_comparison
+
 warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+
+class VQEHistory:
+    """Track VQE optimization progress."""
+    def __init__(self):
+        self.energy_history = []
+
+    def callback(self, eval_count, params, mean, std):
+        """Callback function for VQE optimizer."""
+        self.energy_history.append(float(mean))
 
 
 def exact_diagonalization(H: SparsePauliOp) -> Tuple[float, np.ndarray]:
     """
-    Compute exact ground state energy via full diagonalization.
+    Compute exact ground state energy via diagonalization.
 
-    LIMITATION: Only works for L≤6 (12 qubits, 4096×4096 matrix, ~260MB).
-    For L≥8, exact diagonalization is impossible due to memory constraints.
+    Uses dense diagonalization for L <= 6 (Hilbert space <= 4096)
+    and sparse Lanczos method (scipy.sparse.linalg.eigsh) for L > 6.
+
+    Sparse Lanczos allows exact diagonalization up to L ~ 10-12
+    depending on available memory and sparsity of the Hamiltonian.
 
     Args:
         H: Hamiltonian as SparsePauliOp
 
     Returns:
         (ground_energy, ground_state_vector)
-
-    Raises:
-        ValueError: If system is too large (>12 qubits)
     """
     num_qubits = H.num_qubits
     hilbert_dim = 2**num_qubits
-    matrix_size_gb = (hilbert_dim**2 * 16) / 1e9  # Complex128 = 16 bytes
 
-    if num_qubits > 12:  # L > 6 for SSH-Hubbard
-        raise ValueError(
-            f"⚠️ Exact diagonalization impossible for {num_qubits} qubits.\n"
-            f"   Required matrix size: {hilbert_dim}×{hilbert_dim} (~{matrix_size_gb:.1f} GB)\n"
-            f"   For L=8: 16 qubits → 65,536×65,536 → 68 GB (exceeds typical RAM)\n"
-            f"   Maximum validated system: L=6 (12 qubits)\n"
-            f"   For larger systems: Use DMRG (approximate, ~1-3% systematic error)"
-        )
-    elif num_qubits > 10:
-        warnings.warn(
-            f"Large system: {num_qubits} qubits requires ~{matrix_size_gb:.2f} GB. "
-            f"May be slow or fail."
-        )
-
-    H_matrix = H.to_matrix()
-    eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
-    return eigenvalues[0], eigenvectors[:, 0]
+    # Use sparse Lanczos for large systems (L > 6)
+    if num_qubits > 12:
+        from scipy.sparse.linalg import eigsh
+        print(f"  Using sparse Lanczos for {num_qubits} qubits (dim={hilbert_dim})...")
+        H_sparse = H.to_matrix(sparse=True)
+        eigenvalues, eigenvectors = eigsh(H_sparse, k=1, which='SA')
+        return eigenvalues[0], eigenvectors[:, 0]
+    else:
+        # Dense diagonalization for smaller systems
+        if num_qubits > 10:
+            matrix_size_gb = (hilbert_dim**2 * 16) / 1e9
+            print(f"  Using dense diag for {num_qubits} qubits (~{matrix_size_gb:.2f} GB)...")
+        H_matrix = H.to_matrix()
+        eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
+        return eigenvalues[0], eigenvectors[:, 0]
 
 
 def run_vqe(ansatz: QuantumCircuit, H: SparsePauliOp, maxiter: int = 200) -> Dict:
-    """Run VQE optimization."""
+    """Run VQE optimization with convergence tracking."""
     estimator = Estimator()
     optimizer = L_BFGS_B(maxiter=maxiter)
 
     np.random.seed(42)
     initial_point = 0.01 * np.random.randn(ansatz.num_parameters)
 
-    vqe = VQE(estimator, ansatz, optimizer, initial_point=initial_point)
+    history = VQEHistory()
+    vqe = VQE(estimator, ansatz, optimizer, initial_point=initial_point, callback=history.callback)
 
     start_time = time.time()
     result = vqe.compute_minimum_eigenvalue(H)
@@ -107,6 +118,7 @@ def run_vqe(ansatz: QuantumCircuit, H: SparsePauliOp, maxiter: int = 200) -> Dic
         'evaluations': result.cost_function_evals,
         'runtime': runtime,
         'optimal_params': result.optimal_point,
+        'energy_history': history.energy_history,
     }
 
 
@@ -184,12 +196,29 @@ def benchmark_system(L: int, t1: float, t2: float, U: float, reps: int = 2, maxi
                 'depth': ansatz.depth(),
                 'evaluations': vqe_result['evaluations'],
                 'runtime': vqe_result['runtime'],
+                'energy_history': vqe_result['energy_history'],
             }
 
             print(f"  ✓ Energy:      {energy:.10f}")
             print(f"  ✓ Error:       {abs_error:.3e} ({rel_error:.2f}%)")
             print(f"  ✓ Evaluations: {vqe_result['evaluations']}")
             print(f"  ✓ Runtime:     {vqe_result['runtime']:.2f}s")
+
+            # Generate convergence plots
+            if len(vqe_result['energy_history']) > 0:
+                try:
+                    plot_vqe_convergence(
+                        energy_history=vqe_result['energy_history'],
+                        exact_energy=E_exact,
+                        ansatz_name=ansatz_name,
+                        L=L,
+                        output_dir='../results',
+                        prefix=f'benchmark_L{L}_delta{delta:.2f}_U{U:.1f}',
+                        show_stats=False  # Already printed above
+                    )
+                    print(f"  ✓ Convergence plots saved")
+                except Exception as e:
+                    print(f"  ⚠ Could not generate convergence plots: {e}")
 
         except Exception as e:
             print(f"  ✗ ERROR: {str(e)}")
@@ -223,6 +252,24 @@ def benchmark_system(L: int, t1: float, t2: float, U: float, reps: int = 2, maxi
         print(f"  Fastest:             {fastest[0]:<12} ({fastest[1]['runtime']:.2f}s)")
         print(f"  Most Efficient:      {most_efficient[0]:<12} "
               f"({most_efficient[1]['abs_error']/most_efficient[1]['num_params']:.3e} error/param)")
+
+    # Generate multi-ansatz comparison plot
+    try:
+        histories = {name: res['energy_history']
+                    for name, res in results.items()
+                    if 'energy_history' in res and len(res['energy_history']) > 0}
+
+        if len(histories) > 1:
+            print("\nGenerating multi-ansatz comparison plot...")
+            plot_multi_ansatz_comparison(
+                results_dict=histories,
+                L=L,
+                exact_energy=E_exact,
+                output_dir='../results',
+                filename=f'benchmark_L{L}_delta{delta:.2f}_U{U:.1f}_all_ansatze.png'
+            )
+    except Exception as e:
+        print(f"  Warning: Could not generate comparison plot: {e}")
 
     return {
         'L': L,

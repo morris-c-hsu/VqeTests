@@ -1643,30 +1643,28 @@ Examples:
     # Exact diagonalization
     print("\n--- Exact Diagonalization ---")
 
-    # Size check for exact diagonalization
+    # Size check and method selection
     num_qubits = H.num_qubits
     hilbert_dim = 2**num_qubits
-    matrix_size_gb = (hilbert_dim**2 * 16) / 1e9  # Complex128 = 16 bytes
 
-    if num_qubits > 12:  # L > 6 for SSH-Hubbard
-        raise ValueError(
-            f"⚠️ Exact diagonalization impossible for {num_qubits} qubits (L={L}).\n"
-            f"   Required matrix size: {hilbert_dim}×{hilbert_dim} (~{matrix_size_gb:.1f} GB)\n"
-            f"   L=8 requires 68 GB, which exceeds typical RAM limits.\n"
-            f"   Options: (1) Use L≤6, or (2) Use DMRG (approximate, ~1-3% systematic error)"
-        )
-    elif num_qubits > 10:  # Warning for large systems
-        warnings.warn(
-            f"Large system: {num_qubits} qubits requires ~{matrix_size_gb:.2f} GB. "
-            f"Exact diagonalization may be slow or fail due to memory constraints."
-        )
-
-    H_matrix = H.to_matrix()
-    print(f"Hilbert space dimension: {H_matrix.shape[0]}")
-
-    eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
-    exact_energy = eigenvalues[0]
-    exact_state = Statevector(np.ascontiguousarray(eigenvectors[:, 0]))
+    # Use sparse Lanczos for L > 6
+    if num_qubits > 12:
+        from scipy.sparse.linalg import eigsh
+        print(f"Using sparse Lanczos method for {num_qubits} qubits (dim={hilbert_dim})")
+        H_sparse = H.to_matrix(sparse=True)
+        eigenvalues, eigenvectors = eigsh(H_sparse, k=1, which='SA')
+        exact_energy = eigenvalues[0]
+        exact_state = Statevector(np.ascontiguousarray(eigenvectors[:, 0]))
+    else:
+        # Dense diagonalization for L <= 6
+        if num_qubits > 10:
+            matrix_size_gb = (hilbert_dim**2 * 16) / 1e9
+            print(f"Using dense diagonalization for {num_qubits} qubits (~{matrix_size_gb:.2f} GB)")
+        H_matrix = H.to_matrix()
+        print(f"Hilbert space dimension: {H_matrix.shape[0]}")
+        eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
+        exact_energy = eigenvalues[0]
+        exact_state = Statevector(np.ascontiguousarray(eigenvectors[:, 0]))
 
     print(f"Ground state energy: {exact_energy:.10f}")
     print(f"Energy per site:     {exact_energy / L:.10f}")

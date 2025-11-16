@@ -51,10 +51,23 @@ class VQEHistory:
 
 
 def exact_diagonalization(H: SparsePauliOp):
-    """Compute exact ground state energy."""
-    H_matrix = H.to_matrix()
-    eigenvalues = np.linalg.eigh(H_matrix)[0]
-    return eigenvalues[0]
+    """
+    Compute exact ground state energy.
+
+    Uses dense diagonalization for L <= 6 (Hilbert space <= 4096)
+    and sparse Lanczos method for L > 6.
+    """
+    dim = 2 ** H.num_qubits
+
+    if dim > 4096:
+        from scipy.sparse.linalg import eigsh
+        H_sparse = H.to_matrix(sparse=True)
+        eigenvalues = eigsh(H_sparse, k=1, which='SA', return_eigenvectors=False)
+        return eigenvalues[0]
+    else:
+        H_matrix = H.to_matrix()
+        eigenvalues = np.linalg.eigh(H_matrix)[0]
+        return eigenvalues[0]
 
 
 def run_vqe_extended(ansatz, H, maxiter=500, seed=42):

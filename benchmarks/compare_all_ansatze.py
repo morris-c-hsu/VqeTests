@@ -62,6 +62,9 @@ def exact_diagonalization(H: SparsePauliOp) -> Tuple[float, np.ndarray]:
     """
     Compute exact ground state energy and state via full diagonalization.
 
+    Uses dense diagonalization for L <= 6 (Hilbert space <= 4096)
+    and sparse Lanczos method for L > 6.
+
     Parameters
     ----------
     H : SparsePauliOp
@@ -74,10 +77,22 @@ def exact_diagonalization(H: SparsePauliOp) -> Tuple[float, np.ndarray]:
     psi0 : np.ndarray
         Ground state vector
     """
-    H_matrix = H.to_matrix()
-    eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
-    E0 = eigenvalues[0]
-    psi0 = eigenvectors[:, 0]
+    dim = 2 ** H.num_qubits
+
+    # Use sparse methods for large systems (L > 6 means dim > 4096)
+    if dim > 4096:
+        from scipy.sparse.linalg import eigsh
+        H_sparse = H.to_matrix(sparse=True)
+        eigenvalues, eigenvectors = eigsh(H_sparse, k=1, which='SA')
+        E0 = eigenvalues[0]
+        psi0 = eigenvectors[:, 0]
+    else:
+        # Dense diagonalization for small systems
+        H_matrix = H.to_matrix()
+        eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
+        E0 = eigenvalues[0]
+        psi0 = eigenvectors[:, 0]
+
     return E0, psi0
 
 

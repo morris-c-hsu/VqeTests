@@ -1,15 +1,42 @@
 # Ansatz Overview
 
-This document describes the 8 ansätze implemented for the SSH-Hubbard VQE.
+This document describes the ansätze implemented for the SSH-Hubbard VQE.
+
+## Organization
+
+### Main Ansätze (Standard Benchmarks)
+
+The main benchmark suite focuses on **3 core ansätze**:
+
+| Ansatz | Location | Number-Conserving | Purpose |
+|--------|----------|-------------------|---------|
+| **HEA** | ssh_hubbard_vqe.py | ✗ No | Generic baseline |
+| **HVA** | ssh_hubbard_vqe.py | ✓ Yes | Hamiltonian-inspired |
+| **NP_HVA** | ssh_hubbard_vqe.py | ✓✓ Strict | Strict number conservation |
+
+### Archived Ansätze (Available for Research)
+
+5 additional ansätze in `src/ansatze/archived_ansatze.py`:
+
+| Ansatz | Number-Conserving | Purpose |
+|--------|-------------------|---------|
+| **TopoInspired** | ✗ No | SSH topological structure |
+| **TopoRN** | ✓ Yes | SSH structure + number-conserving |
+| **DQAP** | ✓ Yes | Adiabatic/QAOA-style |
+| **TN_MPS** | ✗ No | Tensor network brick-wall |
+| **TN_MPS_NP** | ✓ Yes | TN brick-wall + number-conserving |
+
+**Why archived?** To focus testing resources on the most relevant ansätze while preserving implementations for future research.
 
 ---
 
-## Available Ansätze
+## Main Ansätze (Detailed)
 
 ### 1. HEA (Hardware-Efficient Ansatz)
 **Command**: `--ansatz hea`
+**File**: `src/ssh_hubbard_vqe.py`
 
-**Description**: Standard EfficientSU2 circuit from Qiskit's circuit library.
+**Description**: Standard EfficientSU2 circuit from Qiskit.
 
 **Features**:
 - Generic, problem-agnostic structure
@@ -28,6 +55,7 @@ This document describes the 8 ansätze implemented for the SSH-Hubbard VQE.
 
 ### 2. HVA (Hamiltonian-Variational Ansatz)
 **Command**: `--ansatz hva`
+**File**: `src/ssh_hubbard_vqe.py`
 
 **Description**: Layers mimicking the SSH-Hubbard Hamiltonian structure.
 
@@ -46,67 +74,9 @@ Layer = Hopping(t1, t2) + Interaction(U) + Single-qubit rotations
 
 ---
 
-### 3. TopoInspired (Topological/Problem-Inspired)
-**Command**: `--ansatz topoinsp`
-
-**Description**: Dimer pattern reflecting SSH bond structure + edge entanglement.
-
-**Features**:
-- Strong bonds (t1): Entangle sites 0↔1, 2↔3, ...
-- Weak bonds (t2): Entangle sites 1↔2, 3↔4, ...
-- Edge links between dimers
-- Does NOT preserve particle number
-
-**Structure**:
-```
-Layer = Strong-bond-gates + Weak-bond-gates + Edge-links + Rotations
-```
-
-**Best for**: Exploiting SSH topological structure
-
----
-
-### 4. TopoRN (RN-Topological)
-**Command**: `--ansatz topo_rn`
-
-**Description**: Number-conserving version of TopoInspired using RN gates.
-
-**Features**:
-- Same topological structure as TopoInspired
-- **Preserves particle number** (RN gates instead of arbitrary 2-qubit)
-- More restricted gate set
-
-**Structure**:
-```
-Layer = RN-strong-bonds + RN-weak-bonds + RN-edge-links + RZ rotations
-```
-
-**Best for**: Number-conserving topological structure
-
----
-
-### 5. DQAP (Digital-Adiabatic / QAOA-Style)
-**Command**: `--ansatz dqap`
-
-**Description**: QAOA/adiabatic-inspired layers with Hamiltonian time evolution.
-
-**Features**:
-- Mimics exp(-iHt) decomposition
-- Separate hopping and interaction evolution
-- **Preserves particle number**
-- Many parameters (β, γ angles)
-
-**Structure**:
-```
-Layer = exp(-iβ*H_hop) + exp(-iγ*H_int) + Mixer
-```
-
-**Best for**: Adiabatic-style optimization, deep circuits
-
----
-
-### 6. NP_HVA (Number-Preserving HVA)
+### 3. NP_HVA (Number-Preserving HVA)
 **Command**: `--ansatz np_hva`
+**File**: `src/ssh_hubbard_vqe.py`
 
 **Description**: Strict number-conserving HVA using UNP gates.
 
@@ -124,91 +94,103 @@ Layer = UNP-hopping + Number-preserving interaction + RZ rotations
 
 ---
 
-### 7. TN_MPS (Tensor-Network MPS)
-**Command**: `--ansatz tn_mps`
+## Archived Ansätze (Brief Descriptions)
 
-**Description**: Brick-wall MPS-like circuit inspired by tensor networks.
+The following ansätze are implemented in `src/ansatze/archived_ansatze.py`. See that file for detailed documentation.
 
-**Features**:
-- Brick-wall structure (alternating even/odd bonds)
-- Global coverage of all qubits
-- Does NOT preserve particle number
-- Requires half-filling initialization
+### TopoInspired - Topological/Problem-Inspired
+- SSH dimer pattern (strong/weak bonds)
+- Edge entanglement
+- Does NOT conserve particle number
 
-**Structure**:
-```
-Layer = Even-bond gates (0↔1, 2↔3, ...) + Odd-bond gates (1↔2, 3↔4, ...)
-```
+### TopoRN - RN-Topological
+- Same SSH structure as TopoInspired
+- **Number-conserving** (RN gates)
+- More restricted gate set
 
-**Best for**: Tensor network approximation, entanglement structure
+### DQAP - Digital-Adiabatic (QAOA-style)
+- Adiabatic evolution layers
+- **Number-conserving**
+- High parameter count
 
-**Warning**: Can converge to vacuum sector if initialized wrong!
+### TN_MPS - Tensor-Network MPS
+- Brick-wall MPS-like structure
+- Does NOT conserve particle number
+- Requires careful initialization
 
----
-
-### 8. TN_MPS_NP (Number-Preserving TN-MPS)
-**Command**: `--ansatz tn_mps_np`
-
-**Description**: Number-conserving version of TN_MPS.
-
-**Features**:
-- Same brick-wall structure as TN_MPS
-- **Preserves particle number** (UNP gates)
+### TN_MPS_NP - Number-Preserving TN-MPS
+- Same brick-wall structure
+- **Number-conserving** (UNP gates)
 - Safe against sector drift
 
-**Structure**:
-```
-Layer = Even UNP gates + Odd UNP gates + RZ rotations
-```
+---
 
-**Best for**: Tensor network structure with number conservation
+## Quick Comparison
+
+| Ansatz | In Benchmarks? | N-Conserving? | SSH-Aware? | Complexity |
+|--------|----------------|---------------|------------|------------|
+| HEA | ✓ Yes | ✗ No | ✗ No | Low |
+| HVA | ✓ Yes | ✓ Yes | ✓ Yes | Medium |
+| NP_HVA | ✓ Yes | ✓✓ Strict | ✓ Yes | Medium |
+| TopoInspired | Archived | ✗ No | ✓ Yes | Medium |
+| TopoRN | Archived | ✓ Yes | ✓ Yes | Medium |
+| DQAP | Archived | ✓ Yes | ✓ Yes | High |
+| TN_MPS | Archived | ✗ No | ✗ No | Low |
+| TN_MPS_NP | Archived | ✓ Yes | ✗ No | Low |
 
 ---
 
-## Quick Comparison Table
+## Usage
 
-| Ansatz | Number-Conserving? | SSH-Aware? | Gate Type | Complexity |
-|--------|-------------------|------------|-----------|------------|
-| HEA | ✗ No | ✗ No | Arbitrary | Low |
-| HVA | ✓ Yes | ✓ Yes | Givens | Medium |
-| TopoInspired | ✗ No | ✓ Yes | Arbitrary | Medium |
-| TopoRN | ✓ Yes | ✓ Yes | RN gates | Medium |
-| DQAP | ✓ Yes | ✓ Yes | Hamiltonian | High |
-| NP_HVA | ✓✓ Strict | ✓ Yes | UNP | Medium |
-| TN_MPS | ✗ No | ✗ No | Arbitrary | Low |
-| TN_MPS_NP | ✓ Yes | ✗ No | UNP | Low |
+### Standard Benchmarks (3 Main Ansätze)
 
-**Legend**:
-- ✓ Yes: Feature present
-- ✗ No: Feature absent
-- ✓✓ Strict: Enforced at circuit level
+```bash
+# Compare HEA, HVA, NP_HVA for L=4
+python benchmarks/compare_all_ansatze.py --L 4
+
+# Quick benchmark
+python benchmarks/quick_benchmark.py
+
+# Individual ansatz
+python src/ssh_hubbard_vqe.py --ansatz hea --reps 3
+python src/ssh_hubbard_vqe.py --ansatz hva --reps 2
+python src/ssh_hubbard_vqe.py --ansatz np_hva --reps 2
+```
+
+### Using Archived Ansätze
+
+```python
+# Import from archived module
+from ansatze.archived_ansatze import (
+    build_ansatz_topo_sshh,
+    build_ansatz_dqap_sshh,
+    # etc.
+)
+
+# Build ansatz
+circuit = build_ansatz_topo_sshh(L=4, reps=2)
+
+# Use in custom benchmark
+# (See archived_ansatze.py for full API)
+```
 
 ---
 
 ## Choosing an Ansatz
 
-**For accurate physics**:
-- Use number-conserving ansätze (HVA, TopoRN, DQAP, NP_HVA, TN_MPS_NP)
-- SSH-Hubbard model has strict particle number conservation
+**For standard testing** → Use benchmarks with HEA, HVA, NP_HVA
 
-**For baseline comparison**:
-- HEA: Standard benchmark, no problem structure
-- TN_MPS: Tensor network baseline
+**For accurate physics** → HVA or NP_HVA (number-conserving)
 
-**For SSH-specific structure**:
-- HVA: Hamiltonian structure
-- TopoInspired/TopoRN: Dimer pattern
-- DQAP: Adiabatic evolution
+**For baseline comparison** → HEA (generic, no problem structure)
 
-**For exploration**:
-- Try multiple ansätze and compare
-- Use `benchmarks/compare_all_ansatze.py` for systematic comparison
+**For custom research** → Archived ansätze in `src/ansatze/archived_ansatze.py`
 
 ---
 
 ## Performance Notes
 
-**IMPORTANT**: This repository uses **single-run optimization** with no ensemble averaging.
+**CRITICAL**: This repository uses **single-run optimization** with no ensemble averaging.
 
 Because VQE landscapes are highly non-convex:
 - Results reflect a single local minimum
@@ -223,47 +205,6 @@ For scientifically valid comparisons, you would need:
 - Statistical analysis (mean, std, quartiles)
 - Convergence diagnostics
 - Hardware noise modeling (if relevant)
-
----
-
-## Usage Examples
-
-### Single ansatz
-```bash
-# HEA with 3 layers
-python src/ssh_hubbard_vqe.py --ansatz hea --reps 3
-
-# HVA with 2 layers
-python src/ssh_hubbard_vqe.py --ansatz hva --reps 2
-
-# TopoInspired with 3 layers
-python src/ssh_hubbard_vqe.py --ansatz topoinsp --reps 3
-```
-
-### Compare all ansätze
-```bash
-# Compare all 8 ansätze for L=4
-python benchmarks/compare_all_ansatze.py --L 4
-
-# For L=6 (larger system)
-python benchmarks/compare_all_ansatze.py --L 6
-```
-
-### Parameter sweep
-```bash
-# Sweep dimerization δ from -0.6 to 0.6
-python src/ssh_hubbard_vqe.py --ansatz hva --delta-sweep -0.6 0.6 13
-```
-
----
-
-## Circuit Diagrams
-
-Circuit diagrams for L=4 are available in `docs/images/`:
-- `hea_L4.png`
-- `hva_L4.png`
-- `topoinsp_L4.png`
-- (etc.)
 
 ---
 

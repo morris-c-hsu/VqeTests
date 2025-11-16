@@ -245,13 +245,11 @@ def compare_ansatze(L: int, t1: float, t2: float, U: float,
         print(f"  E_exact:          {E_exact:.10f}")
         print(f"  E_exact/site:     {E_exact_per_site:.10f}")
 
-    # Ansatz definitions
+    # Main ansätze (focused on 3 core ansätze for benchmarking)
+    # Additional ansätze available in src/ansatze/archived_ansatze.py
     ansatz_configs = [
         ('hea', lambda: build_ansatz_hea(N, reps), False),
         ('hva', lambda: build_ansatz_hva_sshh(L, reps, t1, t2, include_U=True), True),
-        ('topoinsp', lambda: build_ansatz_topo_sshh(L, reps, use_edge_link=True), False),
-        ('topo_rn', lambda: build_ansatz_topo_rn_sshh(L, reps, use_edge_link=True), False),
-        ('dqap', lambda: build_ansatz_dqap_sshh(L, reps, include_U=True), True),
         ('np_hva', lambda: build_ansatz_np_hva_sshh(L, reps), True),
     ]
 

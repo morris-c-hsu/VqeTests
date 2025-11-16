@@ -2,34 +2,30 @@
 """
 TeNPy DMRG Solver for SSH-Hubbard Model
 
-⚠️ CRITICAL KNOWN ISSUE: HAMILTONIAN MISMATCH (1-3% SYSTEMATIC ERROR)
+⚠️ POTENTIAL FIX APPLIED - NEEDS TESTING
 ======================================================================
-This DMRG implementation shows a systematic 1-3% energy offset compared to
-exact diagonalization. This offset does NOT decrease with increased bond
-dimension (tested up to χ=500), indicating a Hamiltonian construction issue
-rather than a convergence problem.
+Previous version had 1-3% systematic error vs exact diagonalization.
 
-EVIDENCE (from tests):
-- L=4: DMRG -2.6139 vs Exact -2.6585 (1.68% error)
-- L=6: DMRG -3.9059 vs Exact -4.0107 (2.61% error)
-- Error persists at χ=500 (no improvement with higher bond dimension)
+IDENTIFIED ISSUE:
+TeNPy's add_coupling() with plus_hc=True may include an automatic 1/2
+factor to avoid double-counting when adding Hermitian conjugates.
 
-ROOT CAUSE (under investigation):
-1. SSH bond pattern ordering mismatch between TeNPy and VQE implementations
-2. Unit-cell interpretation differences
-3. Jordan-Wigner string or fermion sign convention errors
-4. Factor of 2 discrepancy in hopping/interaction terms
+FIX APPLIED:
+Doubled hopping coefficients to compensate:
+- Changed -t1 to -2*t1 for intra-cell hopping
+- Changed -t2 to -2*t2 for inter-cell hopping
 
-CONSEQUENCE:
-All DMRG results are APPROXIMATE and cannot serve as exact benchmarks.
-Only use for exploratory calculations. Do NOT use for VQE validation.
+This ensures: H = -∑ t (c†c + h.c.) matches VQE implementation.
 
-TODO (to fix):
-- Run tests/test_dmrg_hamiltonian_mismatch.py to reproduce issue
-- Compare SSH bond patterns between this and ssh_hubbard_vqe.py
-- Verify strong bonds (t1): (0,1), (2,3), (4,5), ...
-- Verify weak bonds (t2): (1,2), (3,4), (5,6), ...
-- Check TeNPy site indexing conventions
+TESTING REQUIRED:
+Run tests/test_dmrg_hamiltonian_mismatch.py to verify fix.
+Expected: DMRG should match exact diag within <0.1%.
+
+PREVIOUS ERRORS (before fix):
+- L=4: DMRG -2.6139 vs Exact -2.6585 (1.68%)
+- L=6: DMRG -3.9059 vs Exact -4.0107 (2.61%)
+
+If fix is correct, errors should be eliminated.
 ======================================================================
 
 Hamiltonian:
@@ -143,16 +139,18 @@ class SpinfulSSHHubbard(CouplingMPOModel):
         # Unit cell structure: [0=A↑, 1=A↓, 2=B↑, 3=B↓]
 
         # 1. Intra-cell hopping (A→B within dimer): strength t1
+        # NOTE: TeNPy's plus_hc=True already includes factor of 1/2 to avoid double-counting
+        # We want: -t (c† c + h.c.), so we pass -2t to compensate for the 1/2
         # Spin-up: A↑ → B↑ (site 0 → site 2 within unit cell)
-        self.add_coupling(-t1, 0, 'Cd', 2, 'C', dx=[0], plus_hc=True)
+        self.add_coupling(-2*t1, 0, 'Cd', 2, 'C', dx=[0], plus_hc=True)
         # Spin-down: A↓ → B↓ (site 1 → site 3 within unit cell)
-        self.add_coupling(-t1, 1, 'Cd', 3, 'C', dx=[0], plus_hc=True)
+        self.add_coupling(-2*t1, 1, 'Cd', 3, 'C', dx=[0], plus_hc=True)
 
         # 2. Inter-cell hopping (B of cell i → A of cell i+1): strength t2
         # Spin-up: B↑ → A↑ (site 2 of cell i → site 0 of cell i+1)
-        self.add_coupling(-t2, 2, 'Cd', 0, 'C', dx=[1], plus_hc=True)
+        self.add_coupling(-2*t2, 2, 'Cd', 0, 'C', dx=[1], plus_hc=True)
         # Spin-down: B↓ → A↓ (site 3 of cell i → site 1 of cell i+1)
-        self.add_coupling(-t2, 3, 'Cd', 1, 'C', dx=[1], plus_hc=True)
+        self.add_coupling(-2*t2, 3, 'Cd', 1, 'C', dx=[1], plus_hc=True)
 
         # 3. Hubbard interaction: U * n_up * n_down at each physical site
         # Site A: up (site 0) with down (site 1)

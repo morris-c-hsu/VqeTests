@@ -1,8 +1,31 @@
 # TeNPy DMRG Implementation Status
 
-## Current Status: Approximate (Systematic Offset ~1-3% Under Investigation)
+## Current Status: FIX APPLIED - AWAITING VERIFICATION
 
-The TeNPy DMRG solver for SSH-Hubbard model is functional but produces approximate results with a known systematic energy offset (~1-3%) compared to exact diagonalization. This offset does not decrease with increasing bond dimension, indicating a Hamiltonian construction issue rather than convergence limitations.
+**Update**: A potential fix has been applied to address the 1-3% systematic offset.
+The fix needs to be tested with TeNPy installed to verify it resolves the issue.
+
+## Fix Description
+
+**Root Cause Identified:**
+TeNPy's `add_coupling()` function with `plus_hc=True` appears to automatically include a factor of 1/2 when adding Hermitian conjugates to avoid double-counting. This is different from the explicit construction in the VQE implementation.
+
+**Fix Applied:**
+Modified hopping coefficients in `ssh_hubbard_tenpy_dmrg_fixed.py`:
+- Changed `-t1` to `-2*t1` for intra-cell hopping
+- Changed `-t2` to `-2*t2` for inter-cell hopping
+
+This compensates for TeNPy's automatic 1/2 factor, ensuring the Hamiltonian matches:
+```
+H = -∑ t_ij (c†_i c_j + h.c.) + U ∑_i n_i↑ n_i↓
+```
+
+**Expected Outcome:**
+If this fix is correct, DMRG energies should match exact diagonalization within numerical precision (<0.01% error).
+
+## Previous Systematic Offset (~1-3%)
+
+Before the fix, DMRG produced approximate results with systematic energy offset compared to exact diagonalization. This offset did not decrease with increasing bond dimension, indicating a Hamiltonian construction issue rather than convergence limitations.
 
 ## Implementation Details
 

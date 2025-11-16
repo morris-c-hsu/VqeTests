@@ -1720,9 +1720,14 @@ Examples:
 
     # Try to save circuit diagram
     try:
-        fig = ansatz.decompose().draw('mpl', style='iqp', fold=-1)
+        fig = ansatz.draw(
+            output='mpl',
+            fold=-1,          # single line
+            idle_wires=False
+        )
+        fig.set_size_inches(16, 3)
         fig_path = f'../results/L{L}_{args.ansatz}_circuit.png'
-        fig.savefig(fig_path, dpi=150, bbox_inches='tight')
+        fig.savefig(fig_path, dpi=200, bbox_inches='tight', facecolor='white')
         plt.close(fig)
         print(f"✓ Circuit saved to {fig_path}")
     except Exception as e:

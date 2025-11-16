@@ -1,27 +1,57 @@
 # TeNPy DMRG Implementation Status
 
-## Current Status: FIX APPLIED - AWAITING VERIFICATION
+## Current Status: ROOT CAUSE UNDER INVESTIGATION
 
-**Update**: A potential fix has been applied to address the 1-3% systematic offset.
-The fix needs to be tested with TeNPy installed to verify it resolves the issue.
+**Update**: Extensive debugging has narrowed down the issue significantly, but the root cause in TeNPy has not been identified. A previous fix attempt (doubling hopping coefficients) was tested and **failed** - it made the error worse (1.68% → 147%). The error is **conditional** and only appears under specific circumstances.
 
-## Fix Description
+## Critical Discovery: Error is Conditional
 
-**Root Cause Identified:**
-TeNPy's `add_coupling()` function with `plus_hc=True` appears to automatically include a factor of 1/2 when adding Hermitian conjugates to avoid double-counting. This is different from the explicit construction in the VQE implementation.
+The error **does NOT always appear**. It depends on system size and hopping parameter ratios:
 
-**Fix Applied:**
-Modified hopping coefficients in `ssh_hubbard_tenpy_dmrg_fixed.py`:
-- Changed `-t1` to `-2*t1` for intra-cell hopping
-- Changed `-t2` to `-2*t2` for inter-cell hopping
+**Works perfectly** (error < 0.01%):
+- ✓ L=2 with any parameters
+- ✓ L=4 with t2=0 (isolated dimers)
+- ✓ L=4 with t1=0 (inter-cell hopping only)
+- ✓ L=4 with t2/t1 < 0.5 (weak dimerization)
 
-This compensates for TeNPy's automatic 1/2 factor, ensuring the Hamiltonian matches:
-```
-H = -∑ t_ij (c†_i c_j + h.c.) + U ∑_i n_i↑ n_i↓
-```
+**Has systematic error** (1-6%):
+- ✗ L=4 with t2/t1 ≥ 0.5 (moderate to strong dimerization)
+- ✗ Error increases as t2 approaches or exceeds t1
 
-**Expected Outcome:**
-If this fix is correct, DMRG energies should match exact diagonalization within numerical precision (<0.01% error).
+**Key finding**: Error threshold is **exactly** at t2 = t1/2, not approximately.
+
+## Error Characteristics
+
+1. **Threshold behavior**: Sharp onset at t2/t1 = 0.5
+   - t2/t1 = 0.49: Perfect (0.00% error)
+   - t2/t1 = 0.50: Tiny error (0.01%)
+   - t2/t1 = 0.51: Significant error (0.19%)
+   - t2/t1 = 0.60: Large error (1.68%)
+
+2. **Not a convergence issue**: Error is identical for χ=10 to χ=1000
+   - Actual bond dimension used: only χ≈16
+   - Error magnitude constant regardless of χ_max
+   - → This is a Hamiltonian construction bug, not DMRG approximation
+
+3. **Interference between coupling types**: Each type works perfectly alone
+   - Intra-cell only (t1≠0, t2=0): Perfect
+   - Inter-cell only (t1=0, t2≠0): Perfect
+   - Both together with t2≥t1/2: Error appears
+
+## What Was Tested
+
+**Failed fix attempts**:
+- ✗ Doubling hopping coefficients (made error worse: 147%)
+- ✗ Changing lattice position parameters (no effect)
+- ✗ Manual hermitian conjugate addition (implementation failed)
+
+**Verification tests**:
+- ✓ VQE Hamiltonian verified correct by manual construction
+- ✓ Bond pattern verified correct (SSH structure preserved)
+- ✓ Unit cell mapping verified
+- ✓ Jordan-Wigner fermion signs verified
+
+See `tests/DMRG_DEBUG_REPORT.md` for complete debugging details.
 
 ## Previous Systematic Offset (~1-3%)
 

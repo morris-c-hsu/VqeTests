@@ -139,18 +139,16 @@ class SpinfulSSHHubbard(CouplingMPOModel):
         # Unit cell structure: [0=A↑, 1=A↓, 2=B↑, 3=B↓]
 
         # 1. Intra-cell hopping (A→B within dimer): strength t1
-        # NOTE: TeNPy's plus_hc=True already includes factor of 1/2 to avoid double-counting
-        # We want: -t (c† c + h.c.), so we pass -2t to compensate for the 1/2
         # Spin-up: A↑ → B↑ (site 0 → site 2 within unit cell)
-        self.add_coupling(-2*t1, 0, 'Cd', 2, 'C', dx=[0], plus_hc=True)
+        self.add_coupling(-t1, 0, 'Cd', 2, 'C', dx=[0], plus_hc=True)
         # Spin-down: A↓ → B↓ (site 1 → site 3 within unit cell)
-        self.add_coupling(-2*t1, 1, 'Cd', 3, 'C', dx=[0], plus_hc=True)
+        self.add_coupling(-t1, 1, 'Cd', 3, 'C', dx=[0], plus_hc=True)
 
         # 2. Inter-cell hopping (B of cell i → A of cell i+1): strength t2
         # Spin-up: B↑ → A↑ (site 2 of cell i → site 0 of cell i+1)
-        self.add_coupling(-2*t2, 2, 'Cd', 0, 'C', dx=[1], plus_hc=True)
+        self.add_coupling(-t2, 2, 'Cd', 0, 'C', dx=[1], plus_hc=True)
         # Spin-down: B↓ → A↓ (site 3 of cell i → site 1 of cell i+1)
-        self.add_coupling(-2*t2, 3, 'Cd', 1, 'C', dx=[1], plus_hc=True)
+        self.add_coupling(-t2, 3, 'Cd', 1, 'C', dx=[1], plus_hc=True)
 
         # 3. Hubbard interaction: U * n_up * n_down at each physical site
         # Site A: up (site 0) with down (site 1)

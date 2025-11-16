@@ -49,7 +49,7 @@ from ssh_hubbard_vqe import (
     prepare_half_filling_state,
 )
 
-from plot_utils import plot_vqe_convergence, plot_multi_ansatz_comparison
+from plot_utils import plot_vqe_convergence, plot_multi_ansatz_comparison, plot_multistart_convergence
 
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
@@ -112,12 +112,20 @@ class VQERunner:
         maxiter : int
             Maximum optimizer iterations
         optimizer_name : str
-            Optimizer to use ('L_BFGS_B' or 'COBYLA')
+            Optimizer to use: 'L_BFGS_B', 'COBYLA', or 'SLSQP'
         """
         self.maxiter = maxiter
         self.optimizer_name = optimizer_name
         self.energy_history = []
         self.eval_count = 0
+
+        # Validate optimizer name
+        supported_optimizers = ['L_BFGS_B', 'COBYLA', 'SLSQP']
+        if optimizer_name not in supported_optimizers:
+            raise ValueError(
+                f"Unsupported optimizer: {optimizer_name}. "
+                f"Must be one of {supported_optimizers}"
+            )
 
     def callback(self, eval_count, params, mean, std):
         """Track optimization progress."""
@@ -125,7 +133,7 @@ class VQERunner:
         self.energy_history.append(float(mean))
 
     def run(self, ansatz: QuantumCircuit, hamiltonian: SparsePauliOp,
-            initial_point: np.ndarray = None) -> Dict:
+            initial_point: np.ndarray = None, seed: int = None) -> Dict:
         """
         Run VQE optimization.
 
@@ -137,6 +145,8 @@ class VQERunner:
             The Hamiltonian to minimize
         initial_point : np.ndarray, optional
             Initial parameter values
+        seed : int, optional
+            Random seed for parameter initialization (if initial_point not provided)
 
         Returns
         -------
@@ -152,13 +162,20 @@ class VQERunner:
             optimizer = L_BFGS_B(maxiter=self.maxiter)
         elif self.optimizer_name == 'COBYLA':
             optimizer = COBYLA(maxiter=self.maxiter)
+        elif self.optimizer_name == 'SLSQP':
+            try:
+                from qiskit_algorithms.optimizers import SLSQP
+            except ImportError:
+                from qiskit.algorithms.optimizers import SLSQP
+            optimizer = SLSQP(maxiter=self.maxiter)
         else:
+            # Should never reach here due to __init__ validation
             raise ValueError(f"Unknown optimizer: {self.optimizer_name}")
 
-        # Initial parameters
+        # Initial parameters - use per-call RNG instead of global seed
         if initial_point is None:
-            np.random.seed(42)
-            initial_point = 0.01 * np.random.randn(ansatz.num_parameters)
+            rng = np.random.default_rng(seed)
+            initial_point = 0.01 * rng.standard_normal(ansatz.num_parameters)
 
         # Setup VQE
         estimator = Estimator()
@@ -190,8 +207,64 @@ class VQERunner:
             'optimal_params': optimal_params,
             'evaluations': self.eval_count,
             'runtime': runtime,
-            'energy_history': self.energy_history.copy()
+            'energy_history': self.energy_history.copy(),
+            'seed': seed
         }
+
+
+# ============================================================================
+# MULTI-START VQE
+# ============================================================================
+
+def run_multistart_vqe(
+    runner: VQERunner,
+    ansatz: QuantumCircuit,
+    hamiltonian: SparsePauliOp,
+    seeds: List[int],
+) -> Dict:
+    """
+    Run VQE multiple times with different random seeds (multi-start).
+
+    Parameters
+    ----------
+    runner : VQERunner
+        VQE runner instance with configured optimizer
+    ansatz : QuantumCircuit
+        The variational ansatz
+    hamiltonian : SparsePauliOp
+        The Hamiltonian to minimize
+    seeds : List[int]
+        List of random seeds for different initializations
+
+    Returns
+    -------
+    results : dict
+        Aggregate statistics and per-seed details:
+        - 'per_seed': list of individual run results
+        - 'best': best run (lowest energy)
+        - 'mean_energy': mean energy across all runs
+        - 'std_energy': standard deviation of energies
+        - 'min_energy': minimum energy found
+        - 'max_energy': maximum energy found
+    """
+    per_seed_results = []
+
+    for seed in seeds:
+        res = runner.run(ansatz, hamiltonian, seed=seed)
+        per_seed_results.append(res)
+
+    # Extract energies
+    energies = np.array([r['energy'] for r in per_seed_results])
+    best_idx = int(np.argmin(energies))
+
+    return {
+        'per_seed': per_seed_results,
+        'best': per_seed_results[best_idx],
+        'mean_energy': float(energies.mean()),
+        'std_energy': float(energies.std()),
+        'min_energy': float(energies.min()),
+        'max_energy': float(energies.max()),
+    }
 
 
 # ============================================================================
@@ -200,9 +273,11 @@ class VQERunner:
 
 def compare_ansatze(L: int, t1: float, t2: float, U: float,
                     reps: int = 2, maxiter: int = 200,
-                    verbose: bool = True) -> Dict:
+                    verbose: bool = True, use_multistart: bool = True) -> Dict:
     """
     Compare all available ansätze on a single parameter point.
+
+    Supports multi-optimizer and multi-start VQE for robust benchmarking.
 
     Parameters
     ----------
@@ -218,11 +293,16 @@ def compare_ansatze(L: int, t1: float, t2: float, U: float,
         Maximum VQE iterations
     verbose : bool
         Print progress
+    use_multistart : bool
+        If True, run multi-start VQE with 5 seeds and 3 optimizers.
+        If False, run single VQE with L-BFGS-B (backward compatible).
 
     Returns
     -------
     results : dict
-        Comparison results for all ansätze
+        Comparison results for all ansätze.
+        If use_multistart=True, results['ansatze'][ansatz_name] contains
+        a nested dict with keys for each optimizer name.
     """
     N = 2 * L  # Total qubits
     delta = (t1 - t2) / (t1 + t2)
@@ -230,6 +310,10 @@ def compare_ansatze(L: int, t1: float, t2: float, U: float,
     if verbose:
         print("=" * 70)
         print(f"ANSATZ COMPARISON: L={L}, δ={delta:.3f}, U={U:.2f}")
+        if use_multistart:
+            print("Mode: Multi-start (3 optimizers × 5 seeds)")
+        else:
+            print("Mode: Single-run (L-BFGS-B)")
         print("=" * 70)
 
     # Build Hamiltonian
@@ -256,12 +340,15 @@ def compare_ansatze(L: int, t1: float, t2: float, U: float,
     results = {
         'system': {'L': L, 't1': t1, 't2': t2, 'U': U, 'delta': delta},
         'exact': {'energy': E_exact, 'energy_per_site': E_exact_per_site},
-        'ansatze': {}
+        'ansatze': {},
+        'multistart': use_multistart
     }
 
-    # Run VQE for each ansatz
-    runner = VQERunner(maxiter=maxiter, optimizer_name='L_BFGS_B')
+    # Multi-start configuration
+    optimizers = ["L_BFGS_B", "COBYLA", "SLSQP"] if use_multistart else ["L_BFGS_B"]
+    seeds = [0, 1, 2, 3, 4] if use_multistart else [None]
 
+    # Run VQE for each ansatz
     for ansatz_name, ansatz_builder, needs_initial_state in ansatz_configs:
         if verbose:
             print(f"\n[{ansatz_name.upper()}] Running VQE...")
@@ -278,58 +365,115 @@ def compare_ansatze(L: int, t1: float, t2: float, U: float,
                 full_circuit.compose(ansatz, inplace=True)
                 ansatz = full_circuit
 
-            # Run VQE
-            vqe_result = runner.run(ansatz, H)
+            # Initialize results structure for this ansatz
+            results['ansatze'][ansatz_name] = {}
 
-            # Compute errors
-            energy = vqe_result['energy']
-            abs_error = abs(energy - E_exact)
-            rel_error = 100 * abs_error / abs(E_exact) if E_exact != 0 else 0
-
-            # Store results
-            results['ansatze'][ansatz_name] = {
-                'energy': energy,
-                'energy_per_site': energy / L,
-                'abs_error': abs_error,
-                'rel_error': rel_error,
+            # Circuit metrics (same for all optimizers)
+            circuit_metrics = {
                 'num_params': ansatz.num_parameters,
-                'depth': ansatz.depth(),
-                'evaluations': vqe_result['evaluations'],
-                'runtime': vqe_result['runtime'],
-                'convergence': len(vqe_result['energy_history']),
-                'energy_history': vqe_result['energy_history']
+                'depth': ansatz.depth()
             }
 
-            if verbose:
-                print(f"  Energy:           {energy:.10f}")
-                print(f"  Error:            {abs_error:.3e} ({rel_error:.2f}%)")
-                print(f"  Parameters:       {ansatz.num_parameters}")
-                print(f"  Evaluations:      {vqe_result['evaluations']}")
-                print(f"  Runtime:          {vqe_result['runtime']:.2f}s")
+            # Run with each optimizer
+            for opt_name in optimizers:
+                if verbose:
+                    print(f"  Optimizer: {opt_name}")
 
-            # Generate convergence plots
-            if len(vqe_result['energy_history']) > 0:
-                try:
-                    plot_vqe_convergence(
-                        energy_history=vqe_result['energy_history'],
-                        exact_energy=E_exact,
-                        ansatz_name=ansatz_name,
-                        L=L,
-                        output_dir='../results',
-                        prefix=f'compare_delta{delta:.2f}_U{U:.1f}',
-                        show_stats=verbose
-                    )
-                except Exception as e:
+                runner = VQERunner(maxiter=maxiter, optimizer_name=opt_name)
+
+                if use_multistart:
+                    # Multi-start VQE
+                    multistart_result = run_multistart_vqe(runner, ansatz, H, seeds)
+
+                    # Extract best run
+                    best_energy = multistart_result['best']['energy']
+                    abs_error = abs(best_energy - E_exact)
+                    rel_error = 100 * abs_error / abs(E_exact) if E_exact != 0 else 0
+
+                    # Store results
+                    results['ansatze'][ansatz_name][opt_name] = {
+                        'best_energy': best_energy,
+                        'mean_energy': multistart_result['mean_energy'],
+                        'std_energy': multistart_result['std_energy'],
+                        'min_energy': multistart_result['min_energy'],
+                        'max_energy': multistart_result['max_energy'],
+                        'abs_error_best': abs_error,
+                        'rel_error_best_percent': rel_error,
+                        'per_seed': multistart_result['per_seed'],
+                        **circuit_metrics
+                    }
+
                     if verbose:
-                        print(f"  Warning: Could not generate convergence plots: {e}")
+                        print(f"    Best energy:      {best_energy:.10f}")
+                        print(f"    Mean energy:      {multistart_result['mean_energy']:.10f} ± {multistart_result['std_energy']:.3e}")
+                        print(f"    Error (best):     {abs_error:.3e} ({rel_error:.2f}%)")
+
+                    # Generate convergence plots for multi-start
+                    try:
+                        plot_multistart_convergence(
+                            per_seed_results=multistart_result['per_seed'],
+                            exact_energy=E_exact,
+                            ansatz_name=ansatz_name,
+                            optimizer_name=opt_name,
+                            L=L,
+                            output_dir='../docs/images',
+                            show_stats=verbose
+                        )
+                    except Exception as e:
+                        if verbose:
+                            print(f"    Warning: Could not generate convergence plots: {e}")
+
+                else:
+                    # Single-run VQE (backward compatible)
+                    vqe_result = runner.run(ansatz, H, seed=None)
+
+                    energy = vqe_result['energy']
+                    abs_error = abs(energy - E_exact)
+                    rel_error = 100 * abs_error / abs(E_exact) if E_exact != 0 else 0
+
+                    # Store results (backward compatible format)
+                    results['ansatze'][ansatz_name] = {
+                        'energy': energy,
+                        'energy_per_site': energy / L,
+                        'abs_error': abs_error,
+                        'rel_error': rel_error,
+                        'evaluations': vqe_result['evaluations'],
+                        'runtime': vqe_result['runtime'],
+                        'convergence': len(vqe_result['energy_history']),
+                        'energy_history': vqe_result['energy_history'],
+                        **circuit_metrics
+                    }
+
+                    if verbose:
+                        print(f"  Energy:           {energy:.10f}")
+                        print(f"  Error:            {abs_error:.3e} ({rel_error:.2f}%)")
+                        print(f"  Parameters:       {ansatz.num_parameters}")
+                        print(f"  Evaluations:      {vqe_result['evaluations']}")
+                        print(f"  Runtime:          {vqe_result['runtime']:.2f}s")
+
+                    # Generate convergence plots (single-run only)
+                    if len(vqe_result['energy_history']) > 0:
+                        try:
+                            plot_vqe_convergence(
+                                energy_history=vqe_result['energy_history'],
+                                exact_energy=E_exact,
+                                ansatz_name=ansatz_name,
+                                L=L,
+                                output_dir='../results',
+                                prefix=f'compare_delta{delta:.2f}_U{U:.1f}',
+                                show_stats=verbose
+                            )
+                        except Exception as e:
+                            if verbose:
+                                print(f"  Warning: Could not generate convergence plots: {e}")
 
         except Exception as e:
             if verbose:
                 print(f"  ERROR: {str(e)}")
             results['ansatze'][ansatz_name] = {'error': str(e)}
 
-    # Generate multi-ansatz comparison plot
-    if verbose:
+    # Generate multi-ansatz comparison plot (single-run only)
+    if not use_multistart and verbose:
         try:
             histories = {name: res['energy_history']
                         for name, res in results['ansatze'].items()

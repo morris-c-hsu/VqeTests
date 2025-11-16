@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Generate a comprehensive repository context file for LLM consumption.
+Generate a comprehensive repository context PDF for LLM consumption.
 
-Creates a single text file containing all source code and documentation from the
+Creates a single PDF containing all source code and documentation from the
 repository, formatted with clear file delimiters for easy parsing.
 """
 
@@ -10,6 +10,11 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted
+from reportlab.lib.enums import TA_LEFT
 
 
 # Patterns to exclude from the context file
@@ -104,30 +109,42 @@ def collect_files(root_dir, exclude_patterns, include_extensions):
     return files
 
 
-def format_file_content(rel_path, abs_path):
-    """Format a file's content with clear delimiters."""
+def add_file_to_pdf(story, rel_path, abs_path, styles):
+    """Add a file's content to the PDF story."""
     try:
         with open(abs_path, 'r', encoding='utf-8', errors='replace') as f:
             content = f.read()
 
-        # Create header
-        header = f"\n{'=' * 80}\n"
-        header += f"FILE: {rel_path}\n"
-        header += f"{'=' * 80}\n\n"
+        # Add file header
+        story.append(Spacer(1, 0.2*inch))
+        story.append(Paragraph(f"<b>FILE: {rel_path}</b>", styles['Heading2']))
+        story.append(Spacer(1, 0.1*inch))
 
-        return header + content + "\n"
+        # Add content in preformatted style
+        # Split into chunks to avoid reportlab issues with very long strings
+        max_chunk = 50000
+        if len(content) > max_chunk:
+            for i in range(0, len(content), max_chunk):
+                chunk = content[i:i+max_chunk]
+                story.append(Preformatted(chunk, styles['CodeSmall']))
+        else:
+            story.append(Preformatted(content, styles['CodeSmall']))
+
+        story.append(PageBreak())
 
     except Exception as e:
-        return f"\n{'=' * 80}\nFILE: {rel_path}\nERROR: Could not read file: {e}\n{'=' * 80}\n\n"
+        story.append(Paragraph(f"<b>FILE: {rel_path}</b>", styles['Heading2']))
+        story.append(Paragraph(f"ERROR: Could not read file: {e}", styles['Normal']))
+        story.append(PageBreak())
 
 
 def generate_repository_context(
     root_dir='.',
-    output_file='REPOSITORY_FULL_CONTEXT.txt',
+    output_file='REPOSITORY_FULL_CONTEXT.pdf',
     exclude_patterns=None,
     include_extensions=None
 ):
-    """Generate the repository context file."""
+    """Generate the repository context PDF."""
     if exclude_patterns is None:
         exclude_patterns = EXCLUDE_PATTERNS
     if include_extensions is None:
@@ -137,7 +154,7 @@ def generate_repository_context(
     output_path = root_path / 'docs' / output_file
 
     print("=" * 80)
-    print("GENERATING REPOSITORY CONTEXT FILE")
+    print("GENERATING REPOSITORY CONTEXT PDF")
     print("=" * 80)
     print(f"Root directory: {root_path}")
     print(f"Output file: {output_path}")
@@ -149,34 +166,48 @@ def generate_repository_context(
     print(f"Found {len(files)} files to include")
     print()
 
-    # Generate context file
-    print("Generating context file...")
-    with open(output_path, 'w', encoding='utf-8') as out:
-        # Write header
-        out.write("=" * 80 + "\n")
-        out.write("REPOSITORY FULL CONTEXT\n")
-        out.write("=" * 80 + "\n\n")
-        out.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        out.write(f"Repository: {root_path.name}\n")
-        out.write(f"Total files: {len(files)}\n\n")
+    # Generate PDF
+    print("Generating PDF...")
 
-        # Write table of contents
-        out.write("=" * 80 + "\n")
-        out.write("TABLE OF CONTENTS\n")
-        out.write("=" * 80 + "\n\n")
-        for i, (rel_path, _) in enumerate(files, 1):
-            out.write(f"{i:3d}. {rel_path}\n")
-        out.write("\n")
+    # Create PDF document
+    doc = SimpleDocTemplate(str(output_path), pagesize=letter)
+    story = []
 
-        # Write file contents
-        out.write("=" * 80 + "\n")
-        out.write("FILE CONTENTS\n")
-        out.write("=" * 80 + "\n")
+    # Create styles
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name='CodeSmall',
+        parent=styles['Code'],
+        fontSize=7,
+        leading=9,
+        leftIndent=0,
+        rightIndent=0,
+        fontName='Courier'
+    ))
 
-        for i, (rel_path, abs_path) in enumerate(files, 1):
-            print(f"  [{i}/{len(files)}] {rel_path}")
-            content = format_file_content(rel_path, abs_path)
-            out.write(content)
+    # Title page
+    story.append(Spacer(1, 2*inch))
+    story.append(Paragraph("<b>REPOSITORY FULL CONTEXT</b>", styles['Title']))
+    story.append(Spacer(1, 0.3*inch))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    story.append(Paragraph(f"Repository: {root_path.name}", styles['Normal']))
+    story.append(Paragraph(f"Total files: {len(files)}", styles['Normal']))
+    story.append(PageBreak())
+
+    # Table of contents
+    story.append(Paragraph("<b>TABLE OF CONTENTS</b>", styles['Heading1']))
+    story.append(Spacer(1, 0.2*inch))
+    for i, (rel_path, _) in enumerate(files, 1):
+        story.append(Paragraph(f"{i:3d}. {rel_path}", styles['Normal']))
+    story.append(PageBreak())
+
+    # Add all files
+    for i, (rel_path, abs_path) in enumerate(files, 1):
+        print(f"  [{i}/{len(files)}] {rel_path}")
+        add_file_to_pdf(story, rel_path, abs_path, styles)
+
+    # Build PDF
+    doc.build(story)
 
     # Print summary
     file_size = output_path.stat().st_size
@@ -188,7 +219,7 @@ def generate_repository_context(
     print(f"File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
     print(f"Files included: {len(files)}")
     print()
-    print("You can now copy this file and paste it into an LLM for full context!")
+    print("You can now use this PDF for full repository context!")
     print("=" * 80)
 
 
@@ -197,7 +228,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Generate repository context file for LLM consumption'
+        description='Generate repository context PDF for LLM consumption'
     )
     parser.add_argument(
         '--root',
@@ -206,8 +237,8 @@ def main():
     )
     parser.add_argument(
         '--output',
-        default='REPOSITORY_FULL_CONTEXT.txt',
-        help='Output filename (default: REPOSITORY_FULL_CONTEXT.txt)'
+        default='REPOSITORY_FULL_CONTEXT.pdf',
+        help='Output filename (default: REPOSITORY_FULL_CONTEXT.pdf)'
     )
     parser.add_argument(
         '--include-images',

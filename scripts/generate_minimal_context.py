@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate a minimal repository context file for LLM consumption.
+Generate a minimal repository context PDF for LLM consumption.
 
 Includes only:
 - All Python source files from src/
@@ -11,31 +11,48 @@ Includes only:
 import os
 from pathlib import Path
 from datetime import datetime
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted
 
 
-def format_file_content(rel_path, abs_path):
-    """Format a file's content with clear delimiters."""
+def add_file_to_pdf(story, rel_path, abs_path, styles):
+    """Add a file's content to the PDF story."""
     try:
         with open(abs_path, 'r', encoding='utf-8', errors='replace') as f:
             content = f.read()
 
-        header = f"\n{'=' * 80}\n"
-        header += f"FILE: {rel_path}\n"
-        header += f"{'=' * 80}\n\n"
+        # Add file header
+        story.append(Spacer(1, 0.2*inch))
+        story.append(Paragraph(f"<b>FILE: {rel_path}</b>", styles['Heading2']))
+        story.append(Spacer(1, 0.1*inch))
 
-        return header + content + "\n"
+        # Add content in preformatted style
+        # Split into chunks to avoid reportlab issues with very long strings
+        max_chunk = 50000
+        if len(content) > max_chunk:
+            for i in range(0, len(content), max_chunk):
+                chunk = content[i:i+max_chunk]
+                story.append(Preformatted(chunk, styles['CodeSmall']))
+        else:
+            story.append(Preformatted(content, styles['CodeSmall']))
+
+        story.append(PageBreak())
 
     except Exception as e:
-        return f"\n{'=' * 80}\nFILE: {rel_path}\nERROR: Could not read file: {e}\n{'=' * 80}\n\n"
+        story.append(Paragraph(f"<b>FILE: {rel_path}</b>", styles['Heading2']))
+        story.append(Paragraph(f"ERROR: Could not read file: {e}", styles['Normal']))
+        story.append(PageBreak())
 
 
-def generate_minimal_context(root_dir='..', output_file='REPOSITORY_MINIMAL_CONTEXT.txt'):
-    """Generate minimal context file with src/ code and key docs."""
+def generate_minimal_context(root_dir='..', output_file='REPOSITORY_MINIMAL_CONTEXT.pdf'):
+    """Generate minimal context PDF with src/ code and key docs."""
     root_path = Path(root_dir).resolve()
     output_path = root_path / 'docs' / output_file
 
     print("=" * 80)
-    print("GENERATING MINIMAL REPOSITORY CONTEXT")
+    print("GENERATING MINIMAL REPOSITORY CONTEXT PDF")
     print("=" * 80)
     print(f"Root directory: {root_path}")
     print(f"Output file: {output_path}")
@@ -66,39 +83,53 @@ def generate_minimal_context(root_dir='..', output_file='REPOSITORY_MINIMAL_CONT
         print(f"  - {rel_path}")
     print()
 
-    # Generate context file
-    print("Generating context file...")
-    with open(output_path, 'w', encoding='utf-8') as out:
-        # Write header
-        out.write("=" * 80 + "\n")
-        out.write("MINIMAL REPOSITORY CONTEXT\n")
-        out.write("=" * 80 + "\n\n")
-        out.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        out.write(f"Repository: {root_path.name}\n")
-        out.write(f"Total files: {len(files_to_include)}\n\n")
+    # Generate PDF
+    print("Generating PDF...")
 
-        out.write("Includes:\n")
-        out.write("  - README.md\n")
-        out.write("  - docs/IMPLEMENTATION_SUMMARY.md\n")
-        out.write("  - All Python source files from src/\n\n")
+    # Create PDF document
+    doc = SimpleDocTemplate(str(output_path), pagesize=letter)
+    story = []
 
-        # Write table of contents
-        out.write("=" * 80 + "\n")
-        out.write("TABLE OF CONTENTS\n")
-        out.write("=" * 80 + "\n\n")
-        for i, (rel_path, _) in enumerate(files_to_include, 1):
-            out.write(f"{i:2d}. {rel_path}\n")
-        out.write("\n")
+    # Create styles
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name='CodeSmall',
+        parent=styles['Code'],
+        fontSize=7,
+        leading=9,
+        leftIndent=0,
+        rightIndent=0,
+        fontName='Courier'
+    ))
 
-        # Write file contents
-        out.write("=" * 80 + "\n")
-        out.write("FILE CONTENTS\n")
-        out.write("=" * 80 + "\n")
+    # Title page
+    story.append(Spacer(1, 2*inch))
+    story.append(Paragraph("<b>MINIMAL REPOSITORY CONTEXT</b>", styles['Title']))
+    story.append(Spacer(1, 0.3*inch))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    story.append(Paragraph(f"Repository: {root_path.name}", styles['Normal']))
+    story.append(Paragraph(f"Total files: {len(files_to_include)}", styles['Normal']))
+    story.append(Spacer(1, 0.2*inch))
+    story.append(Paragraph("Includes:", styles['Normal']))
+    story.append(Paragraph("  - README.md", styles['Normal']))
+    story.append(Paragraph("  - docs/IMPLEMENTATION_SUMMARY.md", styles['Normal']))
+    story.append(Paragraph("  - All Python source files from src/", styles['Normal']))
+    story.append(PageBreak())
 
-        for i, (rel_path, abs_path) in enumerate(files_to_include, 1):
-            print(f"  [{i}/{len(files_to_include)}] {rel_path}")
-            content = format_file_content(rel_path, abs_path)
-            out.write(content)
+    # Table of contents
+    story.append(Paragraph("<b>TABLE OF CONTENTS</b>", styles['Heading1']))
+    story.append(Spacer(1, 0.2*inch))
+    for i, (rel_path, _) in enumerate(files_to_include, 1):
+        story.append(Paragraph(f"{i:2d}. {rel_path}", styles['Normal']))
+    story.append(PageBreak())
+
+    # Add all files
+    for i, (rel_path, abs_path) in enumerate(files_to_include, 1):
+        print(f"  [{i}/{len(files_to_include)}] {rel_path}")
+        add_file_to_pdf(story, rel_path, abs_path, styles)
+
+    # Build PDF
+    doc.build(story)
 
     # Print summary
     file_size = output_path.stat().st_size
@@ -110,7 +141,7 @@ def generate_minimal_context(root_dir='..', output_file='REPOSITORY_MINIMAL_CONT
     print(f"File size: {file_size:,} bytes ({file_size / 1024:.2f} KB)")
     print(f"Files included: {len(files_to_include)}")
     print()
-    print("Minimal context ready for LLM!")
+    print("Minimal context PDF ready for LLM!")
     print("=" * 80)
 
 
@@ -119,7 +150,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Generate minimal repository context (src/ + README + IMPLEMENTATION_SUMMARY)'
+        description='Generate minimal repository context PDF (src/ + README + IMPLEMENTATION_SUMMARY)'
     )
     parser.add_argument(
         '--root',
@@ -128,8 +159,8 @@ def main():
     )
     parser.add_argument(
         '--output',
-        default='REPOSITORY_MINIMAL_CONTEXT.txt',
-        help='Output filename (default: REPOSITORY_MINIMAL_CONTEXT.txt)'
+        default='REPOSITORY_MINIMAL_CONTEXT.pdf',
+        help='Output filename (default: REPOSITORY_MINIMAL_CONTEXT.pdf)'
     )
 
     args = parser.parse_args()

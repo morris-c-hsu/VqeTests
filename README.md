@@ -52,8 +52,10 @@ The tensor-network VQE module (`ssh_hubbard_tn_vqe.py`) originally used inconsis
 ### 3.1 Exact Diagonalization (ED)
 
 - Used as the only reliable quantitative method in this repository.
-- Validated for L = 2, 4, 6.
-- All VQE and DMRG results should be compared only to ED for these sizes.
+- **Dense diagonalization**: Validated for L = 2, 4, 6 (Hilbert space up to 4,096 dimensions).
+- **Sparse Lanczos diagonalization**: Extends exact results to L = 7, 8 and beyond using `scipy.sparse.linalg.eigsh`.
+- Performance: 227× speedup for L=6, enables previously impossible systems.
+- All VQE and DMRG results should be compared to ED whenever feasible.
 
 ### 3.2 Variational Quantum Eigensolver (VQE)
 
@@ -160,17 +162,30 @@ They should be interpreted strictly as examples of running VQE with these circui
 ## 6. Code Structure
 
 ```
-
 src/
-ssh_hubbard_vqe.py          # Main VQE + 6 ansätze
-ssh_hubbard_tn_vqe.py       # TN-based ansätze
-ssh_hubbard_tenpy_dmrg_fixed.py  # DMRG (inconsistent results)
-docs/
-IMPLEMENTATION_SUMMARY.md
-images/
-tests/
-test_hamiltonian_consistency.py
+  ssh_hubbard_vqe.py                 # Main VQE + 6 ansätze
+  ssh_hubbard_tn_vqe.py              # TN-based ansätze (MPS-like circuits)
+  ssh_hubbard_tenpy_dmrg_fixed.py   # TeNPy DMRG (has systematic error)
+  plot_utils.py                      # Convergence plotting utilities
 
+benchmarks/
+  compare_all_ansatze.py             # Systematic ansatz comparison
+  benchmark_large_systems.py         # L=6,7,8 system tests
+  run_longer_optimizations.py       # Extended optimization runs
+
+tests/
+  test_sparse_lanczos.py             # Sparse Lanczos validation
+  test_L7_benchmark.py               # L=7 integration test
+  dmrg/                              # DMRG error investigation
+    01_hamiltonian_mismatch.py       # Main DMRG validation
+    02-07_*.py                       # Systematic debugging tests
+    DEBUG_REPORT.md                  # Complete investigation report
+    README.md                        # DMRG test documentation
+
+docs/
+  IMPLEMENTATION_SUMMARY.md          # Implementation details
+  DMRG_STATUS.md                     # DMRG error status
+  SPARSE_LANCZOS.md                  # Sparse diagonalization docs
 ```
 
 ---

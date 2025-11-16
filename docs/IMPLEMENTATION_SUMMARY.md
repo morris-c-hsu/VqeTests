@@ -2,7 +2,7 @@
 
 **Date**: 2025-11-16
 **Branch**: `claude/read-this-r-01DLdEcvW8hustGKsyPjZzLM`
-**Status**: ✅ **COMPLETE**
+**Status**: ✅ **COMPLETE** (Updated with enhanced plotting and COBYLA fixes)
 
 ---
 
@@ -147,13 +147,66 @@ def run_multistart_vqe(runner, ansatz, hamiltonian, seeds):
   - Red band: ±1 std deviation
   - Green dashed: Exact energy reference
 
-- **Right plot**: Error vs iteration (log scale)
+- **Right plot**: Relative error percentage vs iteration (log scale)
   - Same color scheme as left plot
-  - Y-axis: |E_VQE - E_exact|
+  - Y-axis: 100 * |E_VQE - E_exact| / |E_exact| (relative error %)
 
 **Output**: Saves to `docs/images/convergence_{ansatz}_{optimizer}_L{L}.png`
 
 **Integration**: Automatically called in `compare_ansatze()` when `use_multistart=True`
+
+---
+
+### Task 6: Enhanced Plotting and COBYLA Optimization ✓
+
+**Files**: `src/plot_utils.py`, `benchmarks/compare_all_ansatze.py`
+
+**Recent Improvements** (2025-11-16):
+
+1. **Relative Error Percentage Display**:
+   - Changed all convergence plots from absolute error to relative error percentage
+   - Formula: `100 * |E_VQE - E_exact| / |E_exact|`
+   - Y-axis label: "Relative Error (%)" instead of "Absolute Error"
+   - Provides more intuitive understanding of VQE accuracy
+
+2. **COBYLA Iteration Adjustment**:
+   - COBYLA (gradient-free) now gets `max(1000, maxiter * 10)` iterations
+   - Ensures fair comparison with gradient-based optimizers
+   - Gradient-free methods need significantly more function evaluations
+   - Example: `maxiter=100` → COBYLA gets 1000 iterations
+
+**Code** (benchmarks/compare_all_ansatze.py:262-268):
+```python
+elif self.optimizer_name == 'COBYLA':
+    # COBYLA needs more iterations since it's gradient-free
+    cobyla_maxiter = max(1000, self.maxiter * 10)
+    optimizer = COBYLA(maxiter=cobyla_maxiter)
+```
+
+3. **Enhanced Plot Formatting**:
+   - Added dense tick marks for better log-scale readability
+   - Major ticks: 15 logarithmically-spaced markers (10⁰, 10¹, 10², etc.)
+   - Minor ticks: 100 sub-divisions between major ticks
+   - Plain number formatting instead of scientific notation
+   - Format: integers for ≥1%, one decimal for <1%
+   - Major and minor grid lines with different alphas
+
+**Code** (src/plot_utils.py:103-108, 339-345):
+```python
+# Better log-scale formatting
+ax.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=15))
+ax.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=100))
+ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:.0f}' if x >= 1 else f'{x:.1f}'))
+
+ax.grid(True, alpha=0.3, which='major')
+ax.grid(True, alpha=0.15, which='minor')
+```
+
+**Impact**:
+- Plots now clearly show convergence quality as percentage
+- COBYLA gets fair chance to converge (1000+ steps)
+- Log-scale plots easier to read with dense tick marks
+- Professional-quality visualizations for publications
 
 ---
 
@@ -243,21 +296,25 @@ From the original specification, all tasks completed:
 - [x] **Task 3**: compare_ansatze integrates multi-optimizer + multi-start
 - [x] **Task 4**: Convergence history captured for all runs
 - [x] **Task 5**: Convergence plots with all seed trajectories
+- [x] **Task 6**: Enhanced plotting with relative error % and better formatting
 - [x] **Bonus**: CLI tool for batch benchmarking
 - [x] **Bonus**: Comprehensive markdown report generation
 - [x] **Bonus**: Extensive documentation
+- [x] **Bonus**: COBYLA iteration optimization for fair comparison
 
 ---
 
 ## 📝 Key Features
 
-1. **3 Optimizers**: L-BFGS-B, COBYLA, SLSQP
+1. **3 Optimizers**: L-BFGS-B, COBYLA, SLSQP (with automatic COBYLA iteration adjustment)
 2. **5 Random Seeds**: [0, 1, 2, 3, 4] per optimizer
 3. **Statistical Analysis**: Mean, std, min, max across seeds
 4. **Convergence Visualization**: Multi-seed plots with best seed highlighting
-5. **Backward Compatible**: Single-run mode still available (`use_multistart=False`)
-6. **Automated Reports**: Markdown format with tables and plot references
-7. **Production Ready**: Comprehensive error handling and documentation
+5. **Relative Error Plots**: Intuitive percentage-based error visualization
+6. **Enhanced Plot Formatting**: Dense tick marks and plain number formatting for log-scale plots
+7. **Backward Compatible**: Single-run mode still available (`use_multistart=False`)
+8. **Automated Reports**: Markdown format with tables and plot references
+9. **Production Ready**: Comprehensive error handling and documentation
 
 ---
 
@@ -288,8 +345,18 @@ From the original specification, all tasks completed:
 
 All changes committed to branch: `claude/read-this-r-01DLdEcvW8hustGKsyPjZzLM`
 
-**Commit 1**: `0a7ca09` - "Implement multi-start VQE with multiple optimizers"
-**Commit 2**: `af21c59` - "Add comprehensive documentation for multi-start VQE"
+**Initial Implementation**:
+- **Commit 1**: `0a7ca09` - "Implement multi-start VQE with multiple optimizers"
+- **Commit 2**: `af21c59` - "Add comprehensive documentation for multi-start VQE"
+
+**Testing and Refinement**:
+- **Commit 3**: `5cd291f` - "Add L=4 multi-start VQE benchmark results"
+- **Commit 4**: `59d8fa4` - "Add comprehensive test results for multi-start VQE"
+
+**Plot Improvements**:
+- **Commit 5**: `37a6521` - "Update convergence plots to show relative error percentage"
+- **Commit 6**: `ce0446f` - "Regenerate L=4 plots with relative error percentage"
+- **Commit 7**: `cf28f6d` - "Improve COBYLA iterations and plot formatting"
 
 **To merge**: Create PR from `claude/read-this-r-01DLdEcvW8hustGKsyPjZzLM` to main branch
 
@@ -307,10 +374,26 @@ Successfully implemented a production-ready multi-start VQE benchmarking infrast
 ✅ **Markdown reports** with tables and plot references
 ✅ **Backward compatibility** via single-run mode
 ✅ **Comprehensive documentation** (guide + API reference)
+✅ **Relative error plots** with intuitive percentage visualization
+✅ **COBYLA optimization** with automatic iteration adjustment (10x base maxiter)
+✅ **Enhanced plotting** with dense tick marks and professional formatting
 
 **Total implementation**: ~2000 lines of code + documentation
 
 **Ready to use**: Run `python benchmarks/run_multistart_benchmark.py --L 4` to get started!
+
+### Recent Enhancements (2025-11-16)
+
+**Plotting Improvements**:
+- All error plots now show relative error percentage (easier interpretation)
+- Dense tick marks on log-scale plots (15 major + 100 minor)
+- Plain number formatting instead of scientific notation
+- Major and minor grid lines for better readability
+
+**Optimizer Fairness**:
+- COBYLA (gradient-free) automatically gets `max(1000, maxiter × 10)` iterations
+- Ensures fair comparison with gradient-based optimizers (L-BFGS-B, SLSQP)
+- Example: `maxiter=100` → COBYLA gets 1000 iterations
 
 ---
 

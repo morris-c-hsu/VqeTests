@@ -14,6 +14,10 @@ Comprehensive benchmarking infrastructure for robust ansatz comparison:
 - Statistical analysis: mean, std, min, max
 - Convergence visualization with multi-seed plots
 - Automatic markdown report generation
+- **Enhanced Features**:
+  - Relative error percentage plots for intuitive accuracy assessment
+  - COBYLA gets 10× iterations (min 1000) for fair comparison with gradient-based optimizers
+  - Professional plot formatting with dense tick marks and plain number display
 
 **Usage**:
 ```bash
@@ -243,10 +247,16 @@ python run_multistart_benchmark.py --L 4
 - `convergence_{ansatz}_{optimizer}_L{L}.png`
 - Shows all 5 seed trajectories + mean ± std
 - Example: `convergence_hea_L_BFGS_B_L4.png`
+- **Features**:
+  - Left panel: Energy convergence vs iteration
+  - Right panel: Relative error percentage (log scale) = 100 × |E_VQE - E_exact| / |E_exact|
+  - Dense tick marks (15 major + 100 minor) for better readability
+  - Plain number formatting (e.g., "10" instead of "1e1")
+  - Gray lines: all seed runs; Blue: best seed; Red: mean ± std
 
 **Single-run plots** (from quick_benchmark.py):
 - `L{L}_{ansatz}_energy_convergence.png`: Energy vs iteration
-- `L{L}_{ansatz}_error_log.png`: Log-scale error convergence
+- `L{L}_{ansatz}_error_log.png`: Log-scale relative error percentage convergence
 
 ### Reports (`../docs/`)
 

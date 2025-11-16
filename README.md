@@ -1,561 +1,197 @@
-# SSH-Hubbard Lattice: DMRG and VQE Implementations
+# SSH–Hubbard Lattice: Exact Diagonalization, VQE, and DMRG (Research Prototype)
 
-This project implements two complementary approaches for studying the SSH-Hubbard model on 1D lattices:
+This repository implements a set of numerical methods for the spinful Su–Schrieffer–Heeger–Hubbard (SSH–Hubbard) model on one-dimensional chains. It includes:
 
-1. **Exact Diagonalization (ED)**: Full Hilbert-space diagonalization for small systems (L ≤ 6)
-2. **DMRG (Density Matrix Renormalization Group)**: Approximate classical solver for larger systems (L ≥ 8)
-3. **VQE (Variational Quantum Eigensolver)**: Quantum-inspired algorithm with topology-aware ansätze
+1. **Exact Diagonalization (ED)** for L ≤ 6 sites (validated and internally consistent).
+2. **Variational Quantum Eigensolver (VQE)** with several ansätze.
+3. **A TeNPy-based DMRG implementation**, currently known to yield incorrect energies due to a Hamiltonian-construction mismatch.
 
-## Limitations and Scope
-
-### What This Repository Provides:
-- Working VQE implementation for SSH-Hubbard model
-- 8 different ansatz options for small systems
-- Validated results for L≤6 sites (12 qubits)
-- Educational/research codebase for exploring VQE methods
-
-### Critical Limitations:
-
-**1. System Size Restrictions**
-- Only L≤6 validated against exact diagonalization
-- L=8,12 results use DMRG with known ~1-3% systematic error
-- No validation for L>12
-- Exact diagonalization impossible for L≥8 (requires >68GB RAM for L=8)
-
-**2. DMRG Issues**
-- **CRITICAL:** DMRG energies show 1-3% offset compared to exact diagonalization
-- This offset does NOT improve with bond dimension → indicates Hamiltonian construction mismatch
-- Root cause under investigation: likely unit cell interpretation, bond pattern ordering, or Jordan-Wigner convention differences
-- **DMRG results cannot serve as exact benchmarks**
-
-**3. Simulation Limitations**
-- Ideal statevector only (no noise models)
-- No sampling/shot noise simulation
-- No actual quantum hardware execution
-- Single optimization runs (no statistical averaging or error bars)
-- Perfect gates and measurements assumed
-
-**4. Number-Preserving Ansätze**
-- NP_HVA, TN_MPS_NP, and RN/UNP gates designed to preserve particle number
-- **[U, N̂]=0 property has not been formally verified via tests**
-- Gate-level commutation with total number operator assumed but not validated
-
-**5. Limited Parameter Exploration**
-- Mainly tested: U=2.0, δ∈{-0.333, 0, +0.333}
-- Limited boundary condition variations
-- Limited interaction strength range
-- Most benchmarks at single system size (L=6)
-
-**6. No Literature Comparisons**
-- No benchmarking against published VQE-Hubbard results
-- No comparison with ADAPT-VQE, QITE, or other advanced methods
-- Performance claims lack external validation context
-
-**7. VQE Performance Reality**
-- Observed errors: 0.77%-17.75% even on small L=6 system
-- Strong regime-dependence (some ansätze fail in certain phases)
-- Literature shows VQE accuracy typically degrades with system size
-- No evidence that these results scale favorably to larger systems
-
-### Not Production-Ready
-This is a **research/educational prototype**, not production software.
-
-**Appropriate use cases:**
-- Learning VQE and tensor network methods
-- Exploring ansatz designs for small systems
-- Educational demonstrations of quantum algorithms
-- Small-scale algorithm development and testing
-
-**Do NOT use for:**
-- Production quantum computing applications
-- Publishable benchmarks without addressing known issues
-- Quantum hardware deployment without extensive validation
-- Claims of achieving "quantum advantage"
-
-## Physics Background
-
-### SSH Model (Su-Schrieffer-Heeger)
-The SSH model is a 1D tight-binding model with alternating hopping amplitudes:
-- Strong bonds (t1) connect sites: 0-1, 2-3, 4-5, 6-7
-- Weak bonds (t2) connect sites: 1-2, 3-4, 5-6
-
-This dimerization leads to topological edge states when t1 > t2.
-
-### Hubbard Model
-The Hubbard model adds on-site electron-electron interaction:
-- U: interaction energy when two electrons (opposite spins) occupy the same site
-
-### Combined SSH-Hubbard Hamiltonian
-```
-H = -∑_<i,j> t_ij (c†_iσ c_jσ + h.c.) + U ∑_i n_i↑ n_i↓
-```
-
-where:
-- c†_iσ, c_iσ: creation/annihilation operators for electron with spin σ at site i
-- t_ij: hopping amplitude (alternates between t1 and t2)
-- n_iσ: number operator for spin σ at site i
-- U: on-site interaction strength
-
-## Implementation Details
-
-### Key Features
-
-1. **Exact Diagonalization**: For small systems (L ≤ 6), the code uses full Hilbert-space exact diagonalization to find the ground state. This is the only regime with exact validation.
-
-2. **Operator Construction**: Implements fermionic creation/annihilation operators with proper anticommutation relations.
-
-3. **Observable Calculation**: Computes:
-   - Ground state energy
-   - Site occupancies (spin-up, spin-down)
-   - Double occupancy (both spins on same site)
-
-### Code Structure
-
-- `SpinOperators`: Defines single-site operators (creation, annihilation, number operators)
-- `SSHHubbardHamiltonian`: Constructs the full Hamiltonian matrix
-- `DMRG`: Main class (uses exact diagonalization for L ≤ 6; approximate DMRG for larger systems)
-- `main()`: Runs the simulation and displays results
-
-## Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-Requirements:
-- numpy >= 1.21.0
-- scipy >= 1.7.0
-- matplotlib >= 3.4.0
-- qiskit >= 1.0.0 (for VQE)
-- qiskit-algorithms >= 0.3.0 (for VQE)
-- qiskit-aer >= 0.14.0 (for VQE)
+The purpose of this repository is **strictly exploratory**. The code is not intended for production-grade many-body calculations, quantitative benchmarking, or claims of algorithmic performance. All results should be interpreted cautiously, given the methodological limitations described below.
 
 ---
 
-# VQE Implementation with Topology-Aware Ansätze
+## 1. Physical Model
 
-## Overview
+The spinful SSH–Hubbard Hamiltonian is
 
-The `ssh_hubbard_vqe.py` script implements a Variational Quantum Eigensolver for the SSH-Hubbard model with three ansatz options inspired by topological quantum computing and Hamiltonian structure.
+\[
+H = -\sum_{i=1}^{L-1} t_i
+\sum_{\sigma=\uparrow,\downarrow}
+(c^\dagger_{i\sigma} c_{i+1\sigma} + \mathrm{h.c.})
++ U \sum_{i=1}^{L} n_{i\uparrow} n_{i\downarrow},
+\]
 
-### Ansatz Options (8 Total)
+with alternating hopping amplitudes \(t_1\) and \(t_2\) encoded via a dimerization parameter
 
-**Note**: Circuit diagrams for all ansätze are available in `docs/images/` as PNG images. See `docs/IMPLEMENTATION_SUMMARY.md` for complete details and visualizations.
+\[
+\delta = \frac{t_1 - t_2}{t_1 + t_2}.
+\]
 
-#### Primary Ansätze:
+This model captures the interplay between SSH-like dimerization and local electron–electron repulsion. For small systems (L ≤ 6), the full Hilbert space dimension \(4^L\) is manageable, enabling ED as a ground-truth reference.
+
+---
+
+## 2. Fermion-to-Qubit Mapping
+
+All VQE and tensor-network Hamiltonians use an **interleaved Jordan–Wigner mapping**:
+
+\[
+[\text{site}_0\uparrow,\; \text{site}_0\downarrow,\;
+ \text{site}_1\uparrow,\; \text{site}_1\downarrow,\; \dots ].
+\]
+
+The JW strings, Pauli operators, and qubit indices follow Qiskit's convention (qubit 0 is the rightmost).
+The Hamiltonian implemented in `ssh_hubbard_vqe.py` has been checked to agree with explicit dense-matrix ED for L ≤ 6.
+
+The tensor-network VQE module (`ssh_hubbard_tn_vqe.py`) originally used inconsistent indexing conventions; these were reconciled so that both modules now construct identical operator matrices for small L.
+
+---
+
+## 3. Implemented Methods
+
+### 3.1 Exact Diagonalization (ED)
+
+- Used as the only reliable quantitative method in this repository.
+- Validated for L = 2, 4, 6.
+- All VQE and DMRG results should be compared only to ED for these sizes.
+
+### 3.2 Variational Quantum Eigensolver (VQE)
+
+The VQE implementation:
+
+- uses ideal statevector simulation (no hardware noise, no sampling noise),
+- constructs the JW Hamiltonian as Qiskit SparsePauliOps,
+- optimizes circuit parameters using L-BFGS-B,
+- compares energies to ED for L ≤ 6.
+
+**Important methodological limitation:**
+Only **a single optimization run** is performed per ansatz and parameter set (no multi-start or ensemble averaging).
+Because VQE loss landscapes are highly non-convex, this means that:
+
+- the reported energies reflect a *single* local minimum,
+- the results cannot be interpreted as representative of an ansatz's general performance,
+- comparisons between ansätze are not statistically meaningful.
+
+Thus, all VQE results in the repository should be read as examples of *particular optimization trajectories*, not as evidence of relative ansatz quality.
+
+### 3.3 Tensor-Network–Inspired VQE
+
+Two brick-wall, MPS-like circuit families are implemented:
+
+- **TN_MPS**
+- **TN_MPS_NP** (number-preserving variant)
+
+These circuits do **not** enforce particle-number conservation unless explicitly designed to do so. The non-number-preserving TN_MPS ansatz can converge to the wrong particle-number sector if initialized in vacuum; half-filling initialization is required to avoid this.
+
+Because particle-number symmetry is a fundamental property of the SSH–Hubbard model, these ansätze are structurally mismatched to the problem unless the number-preserving variant is used.
+
+### 3.4 DMRG (TeNPy)
+
+The DMRG implementation currently exhibits a **1–3% systematic energy mismatch** relative to ED for L = 4 and L = 6, **independent of bond dimension**.
+
+This indicates a Hamiltonian-construction inconsistency (e.g., incorrect bond pattern, incorrect interaction mapping, or missing fermionic sign conventions), not a truncation error.
+
+As a result:
+
+- DMRG results in this repository should be treated as *qualitative only*,
+- DMRG cannot be used as a reference or benchmark,
+- DMRG energies must not be interpreted as approximations to the true ground state.
+
+---
+
+## 4. VQE Ansatz Library
+
+Eight ansätze are implemented across two files (`ssh_hubbard_vqe.py` and `ssh_hubbard_tn_vqe.py`).
+Circuit images for L = 4 are provided in `docs/images/`.
+
+Each ansatz is briefly described below **without performance claims**.
+
+### Standard / Structure-Aware Ansätze
 
 1. **HEA (Hardware-Efficient Ansatz)**
-   - Standard `EfficientSU2` circuit with Ry, Rz gates and linear entanglement
-   - General-purpose, good baseline performance
-   - Default option for compatibility
+   A generic layered circuit with single-qubit rotations and nearest-neighbor entanglers.
 
 2. **HVA (Hamiltonian-Variational Ansatz)**
-   - Layers structured like the Hamiltonian terms
-   - Even bond hopping layer (t1), odd bond hopping layer (t2), on-site U layer
-   - Uses number-conserving XX+YY gates for hopping, ZZ for interactions
-   - Physics-informed, preserves particle number and Sz symmetry
+   Mimics trotterized time evolution under hopping and interaction terms. Common in fermionic VQE literature and known to preserve some structural features of the Hamiltonian.
 
-3. **TopoInspired (Topological/Problem-Inspired)**
-   - Designed for SSH topology: dimer pattern + edge links
-   - Local Ry rotations followed by strong/weak bond layers
-   - Special edge-to-edge entangler to seed topological edge correlations
-   - Best for studying topological phase transitions
+3. **TopoInspired**
+   Incorporates the SSH dimer pattern explicitly. The implementation uses alternating strong/weak bond layers; the extent to which it captures edge physics depends on optimization.
 
-## Usage
+### Number-Preserving Ansätze
 
-### Basic Single-Point Calculations
+4. **Topo_RN**
+   Topology-aware design with number-preserving two-qubit blocks.
 
-```bash
-# Hardware-efficient ansatz (default)
-python ssh_hubbard_vqe.py --ansatz hea --reps 3
+5. **DQAP**
+   A small-parameter ansatz based on discretized adiabatic evolution.
 
-# Hamiltonian-variational ansatz
-python ssh_hubbard_vqe.py --ansatz hva --reps 2
+6. **NP_HVA**
+   A number-preserving variant of the HVA. Enforces U(1) symmetry at every layer.
 
-# Topological ansatz
-python ssh_hubbard_vqe.py --ansatz topoinsp --reps 3
-```
+### Tensor-Network Circuits
 
-### Custom Parameters
+7. **TN_MPS**
+   Brick-wall circuit approximating a small-bond-dimension MPS.
+   Lacks number conservation and therefore can converge to unphysical sectors unless initialized correctly.
 
-```bash
-# Customize system size, interaction, and hopping
-python ssh_hubbard_vqe.py --ansatz topoinsp --L 6 --U 2.0 --t1 1.0 --t2 0.8 --reps 3
+8. **TN_MPS_NP**
+   Number-preserving variant of TN_MPS.
 
-# Use periodic boundary conditions
-python ssh_hubbard_vqe.py --ansatz hva --periodic --reps 2
-
-# Adjust optimizer iterations
-python ssh_hubbard_vqe.py --ansatz hea --maxiter 500
-```
-
-### Warm-Start Delta Sweep
-
-Sweep through dimerization parameter δ = (t1-t2)/(t1+t2) with parameter warm-starting:
-
-```bash
-# Sweep from δ=-0.6 to δ=+0.6 with 13 points
-python ssh_hubbard_vqe.py --ansatz topoinsp --delta-sweep -0.6 0.6 13
-
-# Results saved to: ../results/L{L}_{ansatz}_delta_sweep.csv
-# Plot saved to: ../results/L{L}_{ansatz}_delta_error.png
-```
-
-The warm-start feature uses the optimal parameters from each δ point as the initial parameters for the next, significantly reducing optimization time and improving convergence.
-
-## Features
-
-### Benchmarking (L ≤ 6 only)
-
-VQE runs for L ≤ 6 include exact diagonalization for validation:
-- Ground state energy comparison
-- Observable-by-observable error analysis
-- Convergence tracking against ED baseline
-
-For L ≥ 8, exact validation is not available. DMRG can provide approximate reference values (with known systematic offset).
-
-### Comprehensive Observables
-
-**Z-basis (single measurement circuit)**:
-- Energy per site and variance
-- Double occupancy: ⟨n↑n↓⟩
-- Nearest-neighbor spin correlations: ⟨Sz_i Sz_j⟩
-- Structure factor S^zz(π) (optional)
-
-**XY-basis (multiple circuits)**:
-- Bond order parameters for each bond
-- Dimer order parameter (alternating sum)
-
-**Edge diagnostics (open boundaries)**:
-- Edge particle densities
-- Edge-to-edge spin correlation
-
-**Topological diagnostics (statevector mode)**:
-- **Edge concurrence**: Wootters concurrence between edge qubits (averaged over spins)
-- **Bond purity**: Tr(ρ²) for strong vs weak bonds, measures entanglement asymmetry
-
-### Output Files
-
-All results are saved to `../results/`:
-- Circuit diagrams: `L{L}_{ansatz}_circuit.png`
-- Energy convergence: `L{L}_{ansatz}_energy_convergence.png`
-- Error convergence (log scale): `L{L}_{ansatz}_error_log.png`
-- Delta sweep data: `L{L}_{ansatz}_delta_sweep.csv`
-- Delta sweep plot: `L{L}_{ansatz}_delta_error.png`
-
-## Example Output
-
-```
-======================================================================
-SSH-HUBBARD VQE SIMULATION
-======================================================================
-System: L=6 sites, N=12 qubits
-Ansatz: TOPOINSP, Reps=3
-Parameters: t1=1.0, t2=0.8, U=2.0, δ=0.1111
-Boundary: Open
-======================================================================
-
-Hamiltonian: 156 Pauli terms on 12 qubits
-
---- Exact Diagonalization ---
-Hilbert space dimension: 4096
-Ground state energy: -4.8234567890
-Energy per site:     -0.8039094648
-
---- Building TOPOINSP Ansatz ---
-Circuit depth:  42
-Parameters:     78
-Qubits:         12
-Circuit saved to ../results/L6_topoinsp_circuit.png
-
---- Running VQE Optimization ---
-
-======================================================================
-ENERGY COMPARISON
-======================================================================
-ED energy:      -4.8234567890
-VQE energy:     -4.8234512345
-Absolute error: 5.555e-06
-Relative error: 0.0001%
-Parameters:     78
-Evaluations:    145
-
-======================================================================
-OBSERVABLE RESULTS
-======================================================================
-
---- Z-basis Observables ---
-  Energy/site:        -0.80390946
-  Energy variance:    2.34e-08
-  Double occupancy:   0.142567
-  <S^z S^z>_NN:       0.089234
-
---- XY-basis Observables ---
-  Dimer order D:      0.234567
-  Bond orders:
-    Bond 0 (strong):  0.567890
-    Bond 1 (weak):    0.345678
-    ...
-
---- Edge Diagnostics (Open BC) ---
-  Edge density:       1.234567
-  Edge S^z corr:      0.123456
-
---- Topological Diagnostics ---
-  Edge concurrence:   0.345678
-  Strong bond purity: 0.678901
-  Weak bond purity:   0.456789
-
-======================================================================
-VQE vs ED COMPARISON
-======================================================================
-Observable           VQE           ED        Error      Rel%
-----------------------------------------------------------------------
-Energy/site          -0.803909    -0.803909    1.15e-06   0.00%
-Double occ            0.142567     0.142568    1.23e-06   0.00%
-<SzSz>_NN             0.089234     0.089235    8.90e-07   0.00%
-D_dimer               0.234567     0.234568    1.45e-06   0.00%
-```
-
-## Physics Insights
-
-### Topological Phase Transition
-
-The SSH model exhibits a topological phase transition at δ=0:
-- **δ > 0 (t1 > t2)**: Topologically non-trivial phase with edge states
-- **δ < 0 (t1 < t2)**: Trivial phase without edge states
-- **δ = 0**: Critical point
-
-**Observables to watch**:
-- Edge concurrence increases in topological phase
-- Dimer order parameter changes sign across transition
-- Edge densities show enhancement for δ > 0
-- Bond purity shows strong/weak asymmetry
-
-### Interaction Effects (Hubbard U)
-
-- **U = 0**: Pure SSH, non-interacting fermions
-- **U ~ 2-4**: Moderate correlations, interesting competition with topology
-- **U >> t**: Mott insulator regime, strong localization, suppressed double occupancy
-
-### Ansatz Comparison
-
-Observed performance on L=6 benchmarks (single-run results, no statistics):
-
-**HEA**: Fast convergence, general-purpose, but may miss topology-specific features
-
-**HVA**: Good for capturing interaction physics (U term), designed to preserve symmetries, moderate parameter count
-
-**TopoInspired**: Designed for SSH topology, explicit edge links capture topological features, performance varies across regimes
-
-## Advanced Usage
-
-### Comparing Ansätze
-
-Run all three ansätze on the same system:
-
-```bash
-for ansatz in hea hva topoinsp; do
-    python ssh_hubbard_vqe.py --ansatz $ansatz --L 6 --reps 3 --U 2.0
-done
-```
-
-Compare results in `../results/` directory.
-
-### Topological Phase Diagram
-
-Scan δ with the topological ansatz to map the phase transition:
-
-```bash
-python ssh_hubbard_vqe.py --ansatz topoinsp --delta-sweep -0.8 0.8 17 --L 6 --U 2.0
-```
-
-Plot edge concurrence and dimer order from the CSV to identify the transition.
-
-### Interaction Strength Scan
-
-Fix δ, scan U to study Mott physics:
-
-```python
-# Modify script or run multiple times with different --U values
-for U in 0.0 1.0 2.0 4.0 8.0; do
-    python ssh_hubbard_vqe.py --ansatz hva --U $U --L 6 --reps 3
-done
-```
-
-## Implementation Details
-
-### Jordan-Wigner Mapping
-
-Fermions mapped to qubits with Jordan-Wigner transformation:
-- Each lattice site has 2 qubits: spin-up and spin-down
-- Qubit ordering: [site0↑, site0↓, site1↑, site1↓, ...]
-- Hopping terms become XX+YY with Z string for anticommutation
-- Number operators: n = (I - Z)/2
-
-### Number Conservation
-
-HVA and TopoInspired ansätze are designed to preserve total particle number:
-- No single-qubit X/Y gates (would change occupation)
-- Only number-conserving 2-qubit gates: XX+YY (hopping-like) and ZZ (interaction-like)
-- Reduces Hilbert space exploration, improves convergence for fixed particle number
-- Note: Gate-level commutation with the total number operator has not yet been formally verified
-
-### Measurement Grouping
-
-Observables grouped by Pauli basis:
-- **Z-only group**: All measured simultaneously in computational basis (1 circuit)
-- **XY group**: Each bond order requires separate circuit preparation (~L circuits)
-- **Topology group**: Post-processed from statevector (no additional measurements)
-
-Total measurement count: ~(1 + L) circuits for full observable set
+No claims are made regarding expressiveness, efficiency, or accuracy.
+The repository does not contain sufficient statistical or methodological support for such claims.
 
 ---
 
-# DMRG Implementation
+## 5. Benchmarking Status (L ≤ 6 Only)
 
-## Usage
+The repository includes scripts to run VQE on L = 6 for selected values of \(U\) and \(\delta\).
+However:
 
-Run the DMRG simulation:
+- only single initializations were used,
+- the energy landscape is non-convex,
+- results vary significantly across local minima,
+- no ensemble-based statistics are provided,
+- therefore **the numerical results cannot be considered benchmarks**.
 
-```bash
-python dmrg_ssh_hubbard.py
-```
+They should be interpreted strictly as examples of running VQE with these circuits.
 
-### Customizing Parameters
+---
 
-Edit the `main()` function in `dmrg_ssh_hubbard.py`:
-
-```python
-L = 8          # Number of sites
-t1 = 1.0       # Strong hopping amplitude
-t2 = 0.5       # Weak hopping amplitude
-U = 2.0        # Hubbard interaction strength
-max_states = 64  # Maximum DMRG states (not used for L ≤ 8)
-```
-
-### Example Parameters
-
-**Topological regime** (t1 > t2):
-```python
-t1 = 1.0
-t2 = 0.5
-```
-
-**Trivial regime** (t1 < t2):
-```python
-t1 = 0.5
-t2 = 1.0
-```
-
-**Interaction strength**:
-- U = 0: Non-interacting (pure SSH)
-- U ~ 2-4: Moderate interaction
-- U >> t: Strong interaction (Mott insulator regime)
-
-## Output
-
-The simulation outputs:
-
-1. **Ground State Energy**: Total energy and energy per site
-2. **Site Occupancies**: Electron density for each spin at each site
-3. **Double Occupancy**: Probability of two electrons on same site
-4. **Total Particle Numbers**: Total spin-up, spin-down, and total particles
-
-### Sample Output
+## 6. Code Structure
 
 ```
-==============================================================
-DMRG Simulation: 8-Site SSH-Hubbard Lattice
-==============================================================
 
-Starting DMRG for 8-site SSH-Hubbard lattice
-Parameters: t1=1.0, t2=0.5, U=2.0
-Max states kept: 64
-------------------------------------------------------------
-System small enough for exact diagonalization
-Hilbert space dimension: 65536
-Diagonalizing Hamiltonian...
+src/
+ssh_hubbard_vqe.py          # Main VQE + 6 ansätze
+ssh_hubbard_tn_vqe.py       # TN-based ansätze
+ssh_hubbard_tenpy_dmrg_fixed.py  # DMRG (inconsistent results)
+docs/
+IMPLEMENTATION_SUMMARY.md
+images/
+tests/
+test_hamiltonian_consistency.py
 
-Ground state energy: -5.2345678900
-
-Calculating observables...
-
-==============================================================
-RESULTS
-==============================================================
-
-Ground State Energy: -5.2345678900
-Energy per site: -0.6543209862
-
-Site Occupancies:
-------------------------------------------------------------
-Site  |  n_up  |  n_down  |  n_total  |  double_occ
-------------------------------------------------------------
-  0   | 0.5123 | 0.5123  | 1.0246   | 0.2341
-  1   | 0.4987 | 0.4987  | 0.9974   | 0.2289
-  ...
-
-Total particles (up):    4.0000
-Total particles (down):  4.0000
-Total particles:         8.0000
-Total double occupancy:  1.8456
 ```
 
-## Physics Insights
+---
 
-### What to Look For
+## 7. Appropriate Use
 
-1. **Edge States**: In topological regime (t1 > t2), expect enhanced density at edges (sites 0 and 7)
+This repository is suitable for:
 
-2. **Dimerization Pattern**: Density should show modulation matching the hopping pattern
+- examining Hamiltonian construction for spinful SSH–Hubbard systems,
+- experimenting with different VQE ansätze,
+- learning about tensor-network–like quantum circuits,
+- comparing exact diagonalization with variational methods on *very small* systems.
 
-3. **Interaction Effects**:
-   - Weak U: Delocalized electrons
-   - Strong U: Electrons localize to minimize double occupancy
+It is **not** suitable for:
 
-4. **Half-Filling**: With 8 sites and 8 electrons, system is at half-filling (1 electron per site on average)
+- quantitative VQE benchmarking,
+- performance comparisons between ansätze,
+- large-scale scaling studies,
+- accurate DMRG calculations,
+- any claim of algorithmic superiority or expressiveness.
 
-## Mathematical Details
+All results should be treated as exploratory and non-robust.
 
-### Hilbert Space
-
-Each site has 4 states:
-- |0⟩: empty
-- |↑⟩: spin-up electron
-- |↓⟩: spin-down electron
-- |↑↓⟩: doubly occupied
-
-Total Hilbert space dimension: 4^L = 4^8 = 65,536
-
-### Fermionic Anticommutation
-
-The code implements proper fermionic anticommutation:
-```
-{c_i, c†_j} = δ_ij
-{c_i, c_j} = 0
-```
-
-Sign factors are handled in the operator definitions.
-
-## Future Extensions
-
-1. **Full DMRG**: Implement sweeping algorithm for L > 8
-2. **Correlation Functions**: Calculate spin-spin and density-density correlations
-3. **Entanglement Entropy**: Measure bipartite entanglement
-4. **Time Evolution**: Implement time-dependent DMRG (t-DMRG)
-5. **Visualization**: Plot density profiles, correlation functions
-
-## References
-
-1. White, S. R. (1992). "Density matrix formulation for quantum renormalization groups". Physical Review Letters.
-2. Su, W. P., Schrieffer, J. R., & Heeger, A. J. (1979). "Solitons in polyacetylene". Physical Review Letters.
-3. Hubbard, J. (1963). "Electron correlations in narrow energy bands". Proceedings of the Royal Society A.
-
-## License
-
-MIT License
-
-## Author
-
-Generated for quantum many-body physics research.
+---

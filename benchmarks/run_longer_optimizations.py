@@ -35,7 +35,19 @@ from ssh_hubbard_tn_vqe import (
     build_ansatz_tn_mps_sshh,
 )
 
+from plot_utils import plot_vqe_convergence
+
 warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+
+class VQEHistory:
+    """Track VQE optimization progress."""
+    def __init__(self):
+        self.energy_history = []
+
+    def callback(self, eval_count, params, mean, std):
+        """Callback function for VQE optimizer."""
+        self.energy_history.append(float(mean))
 
 
 def exact_diagonalization(H: SparsePauliOp):
@@ -46,14 +58,15 @@ def exact_diagonalization(H: SparsePauliOp):
 
 
 def run_vqe_extended(ansatz, H, maxiter=500, seed=42):
-    """Run VQE with extended optimization."""
+    """Run VQE with extended optimization and convergence tracking."""
     estimator = Estimator()
     optimizer = L_BFGS_B(maxiter=maxiter)
 
     np.random.seed(seed)
     initial_point = 0.01 * np.random.randn(ansatz.num_parameters)
 
-    vqe = VQE(estimator, ansatz, optimizer, initial_point=initial_point)
+    history = VQEHistory()
+    vqe = VQE(estimator, ansatz, optimizer, initial_point=initial_point, callback=history.callback)
 
     start_time = time.time()
     result = vqe.compute_minimum_eigenvalue(H)
@@ -64,6 +77,7 @@ def run_vqe_extended(ansatz, H, maxiter=500, seed=42):
         'evaluations': result.cost_function_evals,
         'runtime': runtime,
         'optimal_params': result.optimal_point,
+        'energy_history': history.energy_history,
     }
 
 
@@ -106,12 +120,29 @@ def test_ansatz(ansatz_name, ansatz_builder, needs_initial_state, L, H, E_exact,
             'rel_error': rel_error,
             'evaluations': result['evaluations'],
             'runtime': result['runtime'],
+            'energy_history': result['energy_history'],
         })
 
         print(f"    Energy:       {energy:.10f}")
         print(f"    Error:        {abs_error:.6f} ({rel_error:.3f}%)")
         print(f"    Evaluations:  {result['evaluations']}")
         print(f"    Runtime:      {result['runtime']:.2f}s")
+
+        # Generate convergence plots
+        if len(result['energy_history']) > 0:
+            try:
+                plot_vqe_convergence(
+                    energy_history=result['energy_history'],
+                    exact_energy=E_exact,
+                    ansatz_name=ansatz_name,
+                    L=L,
+                    output_dir='../results',
+                    prefix=f'extended_{ansatz_name}_maxiter{maxiter}',
+                    show_stats=False  # Already printed above
+                )
+                print(f"    ✓ Convergence plots saved")
+            except Exception as e:
+                print(f"    ⚠ Could not generate convergence plots: {e}")
 
     # Summary for this ansatz
     print(f"\n  Summary for {ansatz_name}:")

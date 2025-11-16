@@ -158,10 +158,13 @@ class VQERunner:
         self.eval_count = 0
 
         # Initialize optimizer
+        # Note: COBYLA is gradient-free and needs ~10x more iterations
         if self.optimizer_name == 'L_BFGS_B':
             optimizer = L_BFGS_B(maxiter=self.maxiter)
         elif self.optimizer_name == 'COBYLA':
-            optimizer = COBYLA(maxiter=self.maxiter)
+            # COBYLA needs more iterations since it's gradient-free
+            cobyla_maxiter = max(1000, self.maxiter * 10)
+            optimizer = COBYLA(maxiter=cobyla_maxiter)
         elif self.optimizer_name == 'SLSQP':
             try:
                 from qiskit_algorithms.optimizers import SLSQP

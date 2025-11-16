@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import os
 from typing import List, Optional
 
@@ -97,7 +98,14 @@ def plot_vqe_convergence(
     ax.set_xlabel('Evaluation', fontsize=12)
     ax.set_ylabel('Relative Error (%)', fontsize=12)
     ax.set_title(f'VQE Relative Error (log scale) - L={L}, {ansatz_name.upper()}', fontsize=13)
-    ax.grid(True, alpha=0.3)
+
+    # Better log-scale formatting
+    ax.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=15))
+    ax.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=100))
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:.0f}' if x >= 1 else f'{x:.1f}'))
+
+    ax.grid(True, alpha=0.3, which='major')
+    ax.grid(True, alpha=0.15, which='minor')
     plt.tight_layout()
 
     error_path = os.path.join(output_dir, f'{file_prefix}_error_log.png')
@@ -189,8 +197,15 @@ def plot_multi_ansatz_comparison(
     ax2.set_xlabel('Evaluation', fontsize=12)
     ax2.set_ylabel('Relative Error (%)', fontsize=12)
     ax2.set_title(f'Relative Error Convergence (log scale, L={L})', fontsize=13)
+
+    # Better log-scale formatting
+    ax2.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=15))
+    ax2.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=100))
+    ax2.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:.0f}' if x >= 1 else f'{x:.1f}'))
+
     ax2.legend(fontsize=9)
-    ax2.grid(True, alpha=0.3)
+    ax2.grid(True, alpha=0.3, which='major')
+    ax2.grid(True, alpha=0.15, which='minor')
 
     plt.tight_layout()
 
@@ -319,8 +334,15 @@ def plot_multistart_convergence(
     ax2.set_ylabel('Relative Error (%)', fontsize=12)
     ax2.set_title(f'Relative Error Convergence (log scale)\n{ansatz_name.upper()} ({optimizer_name}), L={L}',
                  fontsize=13)
+
+    # Better log-scale formatting
+    ax2.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=15))
+    ax2.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=100))
+    ax2.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x:.0f}' if x >= 1 else f'{x:.1f}'))
+
     ax2.legend(fontsize=9)
-    ax2.grid(True, alpha=0.3)
+    ax2.grid(True, alpha=0.3, which='major')
+    ax2.grid(True, alpha=0.15, which='minor')
 
     plt.tight_layout()
 

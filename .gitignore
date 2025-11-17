@@ -38,6 +38,7 @@ ENV/
 
 # Results and plots
 results/
+output/
 *.png
 *.pdf
 *.csv

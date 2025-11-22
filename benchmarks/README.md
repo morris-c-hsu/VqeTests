@@ -42,40 +42,7 @@ python run_multistart_benchmark.py --L 4 --t1 1.0 --t2 0.5 --U 2.0 --reps 2 --ma
 
 ---
 
-### 2. compare_all_ansatze.py
-
-**Core comparison infrastructure (used by other scripts)**
-
-Provides the foundational comparison functions:
-- `compare_ansatze()`: Compare all ansätze at single parameter point
-- `VQERunner`: VQE execution with convergence tracking
-- `run_multistart_vqe()`: Multi-start orchestration
-- `exact_diagonalization()`: Reference ground state
-
-**Modes**:
-- **Multi-start**: `use_multistart=True` (default)
-- **Single-run**: `use_multistart=False` (backward compatible)
-
-**Direct usage** (when imported as module):
-```python
-from compare_all_ansatze import compare_ansatze
-
-results = compare_ansatze(
-    L=4, t1=1.0, t2=0.5, U=2.0,
-    reps=2, maxiter=200,
-    use_multistart=True  # or False for single-run
-)
-```
-
-**As standalone script**:
-```bash
-python compare_all_ansatze.py
-```
-Runs comprehensive benchmark across multiple parameter regimes (L=4 and L=6).
-
----
-
-### 3. quick_benchmark.py
+### 2. quick_benchmark.py
 
 **Fast single-run comparison for testing**
 
@@ -98,7 +65,7 @@ python quick_benchmark.py
 
 ---
 
-### 4. benchmark_large_systems.py
+### 3. benchmark_large_systems.py
 
 **Benchmarks for L=6, 8 with sparse Lanczos**
 
@@ -120,7 +87,7 @@ python benchmark_large_systems.py
 
 ---
 
-### 5. run_longer_optimizations.py
+### 4. run_longer_optimizations.py
 
 **Extended optimization runs (500-1000 iterations)**
 
@@ -194,8 +161,7 @@ ls -lh ../docs/images/convergence_*.png
 
 | Script | Ansätze | Optimizers | Seeds | L values | Runtime | Output |
 |--------|---------|------------|-------|----------|---------|--------|
-| `run_multistart_benchmark.py` | 3 | 3 | 5 | Custom | ~5-10 min | MD report + plots |
-| `compare_all_ansatze.py` | 3 | 1 | 1 | 4, 6 | ~5-10 min | Terminal output |
+| `run_multistart_benchmark.py` ⭐ | 3 | 3 | 5 | Custom | ~5-10 min | MD report + plots |
 | `quick_benchmark.py` | 3 | 1 | 1 | 4 | ~30-60 sec | Terminal + plots |
 | `benchmark_large_systems.py` | 3 | 1 | 1 | 6, 8 | ~10-30 min | Terminal output |
 | `run_longer_optimizations.py` | 3 | 1 | 1 | 4, 6 | ~30-60 min | Terminal output |
@@ -316,6 +282,18 @@ The sparse Lanczos method is automatically used for L > 6. If still running out 
 - **Ansatz Overview**: [`docs/ANSATZ_OVERVIEW.md`](../docs/ANSATZ_OVERVIEW.md)
 - **Sparse Lanczos**: [`docs/SPARSE_LANCZOS.md`](../docs/SPARSE_LANCZOS.md)
 - **Main README**: [`README.md`](../README.md)
+
+---
+
+## Archived Scripts
+
+Legacy benchmark scripts have been moved to `../docs/archived_benchmarks/` for historical reference:
+
+- **compare_all_ansatze.py** - Older comprehensive comparison tool superseded by `run_multistart_benchmark.py`
+
+These scripts are preserved for reference but are not recommended for new work. See `../docs/archived_benchmarks/README.md` for details.
+
+Additionally, several archived ansätze (TopoInspired, Topo_RN, DQAP, TN_MPS, TN_MPS_NP) are available in `src/ansatze/archived_ansatze.py` but are not part of the standard benchmark suite.
 
 ---
 

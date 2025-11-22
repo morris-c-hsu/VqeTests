@@ -774,8 +774,9 @@ def build_ansatz_hva_sshh(L: int, reps: int, t1: float, t2: float,
                 try:
                     qc.rxx(theta, qi, qj)
                     qc.ryy(theta, qi, qj)
-                except:
-                    # Fallback implementation
+                except Exception as e:
+                    # Fallback implementation for older Qiskit versions
+                    print(f"Warning: rxx/ryy not available ({type(e).__name__}), using fallback")
                     qc.h(qi)
                     qc.h(qj)
                     qc.cx(qi, qj)
@@ -794,7 +795,9 @@ def build_ansatz_hva_sshh(L: int, reps: int, t1: float, t2: float,
                 try:
                     qc.rxx(theta, qi, qj)
                     qc.ryy(theta, qi, qj)
-                except:
+                except Exception as e:
+                    # Fallback implementation for older Qiskit versions
+                    print(f"Warning: rxx/ryy not available ({type(e).__name__}), using fallback")
                     qc.h(qi)
                     qc.h(qj)
                     qc.cx(qi, qj)
@@ -851,7 +854,9 @@ def build_ansatz_topo_sshh(L: int, reps: int, use_edge_link: bool = True) -> Qua
                 try:
                     qc.rxx(gamma, qi, qj)
                     qc.ryy(gamma, qi, qj)
-                except:
+                except Exception as e:
+                    # Fallback implementation for older Qiskit versions
+                    print(f"Warning: rxx/ryy not available ({type(e).__name__}), using fallback")
                     qc.h(qi)
                     qc.h(qj)
                     qc.cx(qi, qj)
@@ -870,7 +875,9 @@ def build_ansatz_topo_sshh(L: int, reps: int, use_edge_link: bool = True) -> Qua
                 try:
                     qc.rxx(gamma, qi, qj)
                     qc.ryy(gamma, qi, qj)
-                except:
+                except Exception as e:
+                    # Fallback implementation for older Qiskit versions
+                    print(f"Warning: rxx/ryy not available ({type(e).__name__}), using fallback")
                     qc.h(qi)
                     qc.h(qj)
                     qc.cx(qi, qj)
@@ -889,7 +896,9 @@ def build_ansatz_topo_sshh(L: int, reps: int, use_edge_link: bool = True) -> Qua
                 try:
                     qc.rxx(gamma_edge, q_left, q_right)
                     qc.ryy(gamma_edge, q_left, q_right)
-                except:
+                except Exception as e:
+                    # Fallback implementation for older Qiskit versions
+                    print(f"Warning: rxx/ryy not available ({type(e).__name__}), using fallback")
                     qc.h(q_left)
                     qc.h(q_right)
                     qc.cx(q_left, q_right)
@@ -1000,7 +1009,9 @@ def build_ansatz_dqap_sshh(L: int, layers: int, include_U: bool = True) -> Quant
                 try:
                     qc.rxx(alpha_m, qi, qj)
                     qc.ryy(alpha_m, qi, qj)
-                except:
+                except Exception as e:
+                    # Fallback implementation for older Qiskit versions
+                    print(f"Warning: rxx/ryy not available ({type(e).__name__}), using fallback")
                     qc.h(qi)
                     qc.h(qj)
                     qc.cx(qi, qj)
@@ -1018,7 +1029,9 @@ def build_ansatz_dqap_sshh(L: int, layers: int, include_U: bool = True) -> Quant
                 try:
                     qc.rxx(beta_m, qi, qj)
                     qc.ryy(beta_m, qi, qj)
-                except:
+                except Exception as e:
+                    # Fallback implementation for older Qiskit versions
+                    print(f"Warning: rxx/ryy not available ({type(e).__name__}), using fallback")
                     qc.h(qi)
                     qc.h(qj)
                     qc.cx(qi, qj)

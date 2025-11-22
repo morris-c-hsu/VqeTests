@@ -97,17 +97,50 @@ These circuits do **not** enforce particle-number conservation unless explicitly
 
 Because particle-number symmetry is a fundamental property of the SSH–Hubbard model, these ansätze are structurally mismatched to the problem unless the number-preserving variant is used.
 
-### 3.4 DMRG (TeNPy)
+### 3.4 DMRG
 
-The DMRG implementation currently exhibits a **1–3% systematic energy mismatch** relative to ED for L = 4 and L = 6, **independent of bond dimension**.
+#### TeNPy DMRG (Known Issues)
+
+The TeNPy DMRG implementation currently exhibits a **1–3% systematic energy mismatch** relative to ED for L = 4 and L = 6, **independent of bond dimension**.
 
 This indicates a Hamiltonian-construction inconsistency (e.g., incorrect bond pattern, incorrect interaction mapping, or missing fermionic sign conventions), not a truncation error.
 
 As a result:
 
-- DMRG results in this repository should be treated as *qualitative only*,
-- DMRG cannot be used as a reference or benchmark,
-- DMRG energies must not be interpreted as approximations to the true ground state.
+- TeNPy DMRG results in this repository should be treated as *qualitative only*,
+- TeNPy DMRG cannot be used as a reference or benchmark,
+- TeNPy DMRG energies must not be interpreted as approximations to the true ground state.
+
+#### dmrgpy DMRG (Alternative Implementation - NEW)
+
+A new **dmrgpy-based DMRG implementation** using ITensor backend has been added to test whether ITensor avoids TeNPy's systematic error.
+
+**Status**: Implementation complete, validation pending
+
+**Features**:
+- Python wrapper for ITensor (C++ and Julia backends)
+- Manual Hamiltonian construction using operator algebra
+- Designed to test problematic regime where TeNPy fails (t2/t1 ≥ 0.5)
+
+**Installation**:
+```bash
+pip install dmrgpy
+```
+
+**Usage**:
+```python
+from ssh_hubbard_dmrgpy import solve_ssh_hubbard_dmrgpy
+
+result = solve_ssh_hubbard_dmrgpy(L=4, t1=1.0, t2=0.6, U=1.0)
+print(f"Ground state energy: {result['energy']:.10f}")
+```
+
+**Validation**:
+```bash
+python tests/test_dmrgpy_validation.py
+```
+
+See [`docs/DMRGPY_IMPLEMENTATION.md`](docs/DMRGPY_IMPLEMENTATION.md) for detailed documentation.
 
 ---
 
@@ -185,6 +218,8 @@ For statistically meaningful comparisons, use the multi-start benchmarking tools
 ```
 src/
   ssh_hubbard_vqe.py                 # Main VQE + 3 main ansätze
+  ssh_hubbard_dmrgpy.py              # ⭐ NEW: dmrgpy/ITensor DMRG implementation
+  ssh_hubbard_tenpy_dmrg_fixed.py    # TeNPy DMRG (has known issues)
   plot_utils.py                      # Convergence plotting with relative error %
   ansatze/
     archived_ansatze.py              # 5 archived ansätze
@@ -200,7 +235,8 @@ benchmarks/
 tests/
   test_sparse_lanczos.py             # Sparse Lanczos validation
   test_L7_benchmark.py               # L=7 integration test
-  dmrg/                              # DMRG error investigation
+  test_dmrgpy_validation.py          # ⭐ NEW: dmrgpy validation suite
+  dmrg/                              # TeNPy DMRG error investigation
     01_hamiltonian_mismatch.py       # Main DMRG validation
     02-07_*.py                       # Systematic debugging tests
     DEBUG_REPORT.md                  # Complete investigation report
@@ -208,10 +244,11 @@ tests/
 
 docs/
   MULTISTART_VQE_GUIDE.md            # ⭐ Multi-start VQE guide
+  DMRGPY_IMPLEMENTATION.md           # ⭐ NEW: dmrgpy/ITensor DMRG docs
   IMPLEMENTATION_SUMMARY.md          # Implementation details & recent updates
   test_results_L4.md                 # L=4 multi-start benchmark results
   ANSATZ_OVERVIEW.md                 # Ansatz documentation
-  DMRG_STATUS.md                     # DMRG error status
+  DMRG_STATUS.md                     # TeNPy DMRG error status
   SPARSE_LANCZOS.md                  # Sparse diagonalization docs
   images/                            # Convergence plots
     convergence_*_L*.png             # Multi-start convergence plots
